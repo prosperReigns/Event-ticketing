@@ -9,6 +9,10 @@ const RSVP_RESPONSES = {
   attending: "attending",
   declined: "declined",
 };
+const RSVP_SUCCESS_MESSAGES = {
+  attending: "Your QR code has been sent to your email.",
+  declined: "Thank you for your response.",
+};
 
 const RsvpPage = () => {
   const { token } = useParams();
@@ -137,17 +141,13 @@ const RsvpPage = () => {
     try {
       await submitRsvp(token, {
         name: formData.name.trim(),
-        email: formData.email.trim() || undefined,
-        phone: formData.phone.trim() || undefined,
+        email: formData.email.trim() || null,
+        phone: formData.phone.trim() || null,
         response,
       });
 
       setExistingStatus(response);
-      setSuccessMessage(
-        response === RSVP_RESPONSES.attending
-          ? "Your QR code has been sent to your email."
-          : "Thank you for your response.",
-      );
+      setSuccessMessage(RSVP_SUCCESS_MESSAGES[response]);
     } catch (err) {
       setError(getErrorMessage(err, "Unable to submit RSVP"));
     } finally {
@@ -199,9 +199,7 @@ const RsvpPage = () => {
         <div className="space-y-2 rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-700">
           <p>{statusMessage || "Thanks for your RSVP!"}</p>
           <p>
-            {currentStatus === RSVP_RESPONSES.attending
-              ? "Your QR code has been sent to your email."
-              : "Thank you for your response."}
+            {RSVP_SUCCESS_MESSAGES[currentStatus]}
           </p>
         </div>
       ) : (

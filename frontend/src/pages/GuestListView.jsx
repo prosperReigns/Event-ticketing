@@ -107,7 +107,9 @@ const GuestListView = () => {
     setCheckingInToken(token);
     try {
       const result = await checkInGuest(token);
-      setSuccessMessage(result?.message || `${guest.name} checked in.`);
+      setSuccessMessage(
+        result?.message || `${guest?.name || "Guest"} checked in.`,
+      );
       await loadGuests();
     } catch (err) {
       setError(getErrorMessage(err, "Unable to check in guest"));
