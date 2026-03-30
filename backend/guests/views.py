@@ -14,10 +14,7 @@ class GuestListCreateView(APIView):
     POST /api/events/{event_id}/guests/  – bulk-create guests
     """
 
-    def get_permissions(self):
-        if self.request.method == "POST":
-            return [permissions.IsAuthenticated()]
-        return [permissions.AllowAny()]
+    permission_classes = [permissions.AllowAny]
 
     def _get_event(self, event_id):
         try:
@@ -50,6 +47,10 @@ class GuestListCreateView(APIView):
         }
         if errors:
             response_data["errors"] = errors
+            if len(errors) == 1:
+                response_data["detail"] = errors[0].get("error", "Guest creation failed.")
+            else:
+                response_data["detail"] = "Some guests could not be created."
 
         http_status = status.HTTP_201_CREATED
         if created and errors:

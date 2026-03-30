@@ -6,6 +6,13 @@ export const getGuests = async (eventId) => {
 };
 
 export const createGuest = async (eventId, payload) => {
-  const response = await api.post(`events/${eventId}/guests/`, payload);
+  const response = await api.post(`events/${eventId}/guests/`, {
+    guests: [payload],
+  });
+
+  if (Array.isArray(response.data?.created)) {
+    return response.data.created[0] || null;
+  }
+
   return response.data;
 };

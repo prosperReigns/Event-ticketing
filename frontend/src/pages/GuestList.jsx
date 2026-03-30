@@ -7,6 +7,8 @@ import { getErrorMessage } from "../api/axios.js";
 import { getEvent } from "../services/eventService.js";
 import { createGuest, getGuests } from "../services/guestService.js";
 
+import api from "../api/axios.js";
+
 const GuestList = () => {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
@@ -102,9 +104,9 @@ const GuestList = () => {
 
     setIsBulkSubmitting(true);
     try {
-      await Promise.all(
-        bulkGuests.map((guest) => createGuest(id, guest)),
-      );
+      await api.post(`events/${id}/guests/`, {
+        guests: bulkGuests,
+      });
       setBulkInput("");
       setSuccessMessage("Bulk guests uploaded successfully.");
       await loadGuests();

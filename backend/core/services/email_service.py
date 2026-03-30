@@ -8,6 +8,7 @@ Provides a single public function:
 import logging
 import base64
 import os
+import html
 
 from django.conf import settings
 
@@ -38,6 +39,7 @@ def send_guest_qr_email(guest) -> bool:
         )
 
         sg = sendgrid.SendGridAPIClient(api_key=api_key)
+        sg.client.timeout = settings.SENDGRID_TIMEOUT_SECONDS
 
         html_content = _build_html_content(guest)
 
@@ -82,20 +84,29 @@ def send_guest_qr_email(guest) -> bool:
 def _build_html_content(guest) -> str:
     event = guest.event
     checkin_url = f"{settings.CHECKIN_DOMAIN}/api/checkin/{guest.unique_token}/"
+    safe_guest_name = html.escape(guest.name)
+    safe_event_name = html.escape(event.name)
+    safe_event_location = html.escape(event.location)
+    safe_table_number = html.escape(guest.table_number)
+    safe_checkin_url = html.escape(checkin_url, quote=True)
+
+    qr_html = ""
+    if guest.qr_code_image:
+        qr_html = '<img src="cid:QRCode" alt="QR code" style="width:200px; height:200px;" />'
 
     return f"""
     <html>
       <body>
-        <h2>Hello {guest.name},</h2>
-        <p>You are invited to <strong>{event.name}</strong>.</p>
+        <h2>Hello {safe_guest_name},</h2>
+        <p>You are invited to <strong>{safe_event_name}</strong>.</p>
         <ul>
-          <li><strong>Location:</strong> {event.location}</li>
+          <li><strong>Location:</strong> {safe_event_location}</li>
           <li><strong>Date &amp; Time:</strong> {event.start_datetime.strftime('%B %d, %Y at %I:%M %p %Z')}</li>
-          <li><strong>Table Number:</strong> {guest.table_number}</li>
+          <li><strong>Table Number:</strong> {safe_table_number}</li>
         </ul>
         <p>Please present the QR code below (or attached) at the entrance:</p>
-        <img src="cid:QRCode" alt="QR Code" style="width:200px;height:200px;" />
-        <p>Or use this link: <a href="{checkin_url}">{checkin_url}</a></p>
+        <div>{qr_html}</div>
+        <p>Or use this link: <a href="{safe_checkin_url}">{safe_checkin_url}</a></p>
         <p>We look forward to seeing you!</p>
       </body>
     </html>

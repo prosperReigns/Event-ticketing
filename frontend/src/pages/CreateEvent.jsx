@@ -42,9 +42,7 @@ const CreateEvent = () => {
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-slate-900">
-          Create Event
-        </h1>
+        <h1 className="text-3xl font-semibold text-slate-900">Create Event</h1>
         <p className="text-sm text-slate-500">
           Add a new event and begin inviting guests.
         </p>
@@ -91,6 +89,7 @@ const CreateEvent = () => {
             onChange={handleChange}
             required
             className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+            placeholder="dd/mm/yyy hh:mm"
           />
         </label>
 

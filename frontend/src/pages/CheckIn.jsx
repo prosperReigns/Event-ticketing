@@ -5,23 +5,42 @@ import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
 import { checkInGuest } from "../services/checkinService.js";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_SEARCH_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
+
 const extractToken = (rawValue) => {
-  if (!rawValue) {
+  const source = rawValue?.trim();
+  if (!source) {
     return "";
   }
 
   try {
-    const url = new URL(rawValue);
+    const url = new URL(source);
     const segments = url.pathname.split("/").filter(Boolean);
     const checkinIndex = segments.indexOf("checkin");
-    if (checkinIndex >= 0 && segments[checkinIndex + 1]) {
-      return segments[checkinIndex + 1];
+    const tokenFromPath = segments[checkinIndex + 1];
+
+    if (tokenFromPath && UUID_PATTERN.test(tokenFromPath)) {
+      return tokenFromPath;
     }
-    return segments[segments.length - 1] || rawValue;
   } catch {
-    const segments = rawValue.split("/").filter(Boolean);
-    return segments[segments.length - 1] || rawValue;
+    // Fall through to non-URL parsing.
   }
+
+  if (UUID_PATTERN.test(source)) {
+    return source;
+  }
+
+  const embeddedMatch = source.match(UUID_SEARCH_PATTERN);
+  if (embeddedMatch?.[0]) {
+    return embeddedMatch[0];
+  }
+
+  const segments = source.split("/").filter(Boolean);
+  const fallback = segments[segments.length - 1] || "";
+  return UUID_PATTERN.test(fallback) ? fallback : "";
 };
 
 const CheckIn = () => {
@@ -90,7 +109,7 @@ const CheckIn = () => {
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <QRScanner key={scanKey} onScan={handleScan} />
+          <QRScanner key={scanKey} onScan={handleScan} isActive={!isChecking} />
         </div>
 
         <div className={`rounded-3xl border p-6 shadow-sm ${cardStyles}`}>

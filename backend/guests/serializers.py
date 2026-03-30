@@ -16,7 +16,6 @@ class GuestSerializer(serializers.ModelSerializer):
             "email",
             "phone",
             "table_number",
-            "unique_token",
             "qr_code_url",
             "has_checked_in",
             "check_in_time",
@@ -24,7 +23,6 @@ class GuestSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "unique_token",
             "qr_code_url",
             "has_checked_in",
             "check_in_time",
@@ -49,7 +47,7 @@ class BulkGuestCreateSerializer(serializers.Serializer):
     )
 
     def validate_guests(self, guests):
-        required = {"name", "email", "table_number"}
+        required = {"name", "email"}
         for i, guest in enumerate(guests):
             missing = required - set(guest.keys())
             if missing:
@@ -57,3 +55,4 @@ class BulkGuestCreateSerializer(serializers.Serializer):
                     f"Guest at index {i} is missing fields: {missing}"
                 )
         return guests
+

@@ -12,4 +12,7 @@ urlpatterns = [
     path("api/", include("events.urls")),
     path("api/", include("guests.urls")),
     path("api/", include("checkins.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

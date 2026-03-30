@@ -1,7 +1,11 @@
 """
-Test-specific settings – overrides the production database to use SQLite.
+Test-specific settings that override runtime settings for deterministic tests.
 """
+from pathlib import Path
+
 from event_checkin.settings import *  # noqa: F401, F403
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 DATABASES = {
     "default": {
@@ -12,6 +16,7 @@ DATABASES = {
 
 # Suppress real email calls
 SENDGRID_API_KEY = ""
+SEND_EMAIL_ASYNC = False
 
-# Point media to /tmp
-MEDIA_ROOT = "/tmp/test_media"
+# Point media to a workspace-local temp directory for cross-platform compatibility.
+MEDIA_ROOT = BASE_DIR / "test_media"

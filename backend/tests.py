@@ -5,8 +5,10 @@ Uses SQLite in-memory DB for speed; no real SendGrid/email calls.
 """
 
 import uuid
+from pathlib import Path
+import tempfile
 from datetime import timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -74,14 +76,17 @@ class GuestCreationTest(TestCase):
 # QR Code tests
 # ---------------------------------------------------------------------------
 
-@override_settings(CHECKIN_DOMAIN="http://testserver", MEDIA_ROOT="/tmp/test_media")
+TEST_MEDIA_ROOT = Path(tempfile.gettempdir()) / "event_checkin_test_media"
+
+
+@override_settings(CHECKIN_DOMAIN="http://testserver", MEDIA_ROOT=str(TEST_MEDIA_ROOT))
 class QRCodeGenerationTest(TestCase):
     def test_generate_qr_creates_image_file(self):
         import os
         import shutil
         from core.services.qr_service import generate_qr_code
 
-        os.makedirs("/tmp/test_media/qr_codes", exist_ok=True)
+        os.makedirs(TEST_MEDIA_ROOT / "qr_codes", exist_ok=True)
         event = make_event()
         guest = make_guest(event)
 
@@ -92,7 +97,7 @@ class QRCodeGenerationTest(TestCase):
         self.assertTrue(guest.qr_code_image.name.endswith(".png"))
 
         # Cleanup
-        shutil.rmtree("/tmp/test_media", ignore_errors=True)
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -182,3 +187,12 @@ class BulkGuestCreationTest(TestCase):
         ]
         bulk_create_guests(self.event, data)
         mock_email.assert_called_once()
+
+    def test_missing_table_number_is_allowed(self, mock_email, mock_qr):
+        data = [
+            {"name": "No Table Guest", "email": "notable@example.com"},
+        ]
+        created, errors = bulk_create_guests(self.event, data)
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0].table_number, "")

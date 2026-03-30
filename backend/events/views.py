@@ -6,7 +6,7 @@ from .serializers import EventSerializer
 class EventViewSet(viewsets.ModelViewSet):
     """
     ViewSet for creating, listing and retrieving events.
-    Write operations require authentication; reads are open.
+    Event management is currently open because frontend auth is not yet enabled.
     """
 
     queryset = Event.objects.all()
@@ -14,6 +14,4 @@ class EventViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "head", "options"]
 
     def get_permissions(self):
-        if self.action in ("create",):
-            return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
