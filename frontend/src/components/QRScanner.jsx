@@ -5,6 +5,7 @@ const QRScanner = ({ onScan, onError, isActive = true }) => {
   const scannerId = useId();
   const elementId = `qr-reader-${scannerId.replace(/:/g, "")}`;
   const hasScannedRef = useRef(false);
+  const isRunningRef = useRef(false);
   const [cameraError, setCameraError] = useState("");
 
   useEffect(() => {
@@ -28,13 +29,23 @@ const QRScanner = ({ onScan, onError, isActive = true }) => {
 
           hasScannedRef.current = true;
           onScan(decodedText);
-          html5QrCode
-            .stop()
-            .then(() => html5QrCode.clear())
-            .catch(() => undefined);
+
+          if (isRunningRef.current) {
+            html5QrCode
+              .stop()
+              .then(() => {
+                isRunningRef.current = false;
+                html5QrCode.clear();
+              })
+              .catch(() => undefined);
+          }
         },
         () => undefined,
       )
+      .then(() => {
+        console.log("QR Scanner started");
+        isRunningRef.current = true;
+      })
       .catch((error) => {
         if (!isMounted) {
           return;
@@ -49,12 +60,18 @@ const QRScanner = ({ onScan, onError, isActive = true }) => {
 
     return () => {
       isMounted = false;
-      html5QrCode
-        .stop()
-        .then(() => html5QrCode.clear())
-        .catch(() => undefined);
+      if (isRunningRef.current) {
+        html5QrCode
+          .stop()
+          .then(() => {
+            isRunningRef.current = false;
+            html5QrCode.clear();
+          })
+          .catch(() => undefined);
+      }
     };
   }, [elementId, isActive, onError, onScan]);
+
 
   return (
     <div className="space-y-3">
