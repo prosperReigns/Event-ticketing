@@ -6,6 +6,8 @@ import CreateEvent from "./pages/CreateEvent.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import EventDetails from "./pages/EventDetails.jsx";
 import GuestList from "./pages/GuestList.jsx";
+import GuestListView from "./pages/GuestListView.jsx";
+import RsvpPage from "./pages/RsvpPage.jsx";
 
 const App = () => {
   return (
@@ -17,7 +19,9 @@ const App = () => {
           <Route path="/events/create" element={<CreateEvent />} />
           <Route path="/events/:id" element={<EventDetails />} />
           <Route path="/events/:id/guests" element={<GuestList />} />
+          <Route path="/events/:id/guests/view" element={<GuestListView />} />
           <Route path="/checkin" element={<CheckIn />} />
+          <Route path="/rsvp/:token" element={<RsvpPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

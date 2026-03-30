@@ -184,5 +184,21 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 SENDGRID_TIMEOUT_SECONDS = config("SENDGRID_TIMEOUT_SECONDS", default=10, cast=int)
 SEND_EMAIL_ASYNC = env_bool("SEND_EMAIL_ASYNC", default=True)
 
+# Brevo
+BREVO_API_KEY = config("BREVO_API_KEY", default="")
+BREVO_SENDER_EMAIL = config("BREVO_SENDER_EMAIL", default=DEFAULT_FROM_EMAIL)
+BREVO_SENDER_NAME = config("BREVO_SENDER_NAME", default="")
+BREVO_TIMEOUT_SECONDS = config("BREVO_TIMEOUT_SECONDS", default=10, cast=int)
+BREVO_EMAIL_URL = config(
+    "BREVO_EMAIL_URL", default="https://api.brevo.com/v3/smtp/email"
+)
+
 # QR Code / domain for check-in URL
 CHECKIN_DOMAIN = config("CHECKIN_DOMAIN", default="http://127.0.0.1:8000")
+RSVP_DOMAIN = config("RSVP_DOMAIN", default=CHECKIN_DOMAIN)
+
+# Termii
+TERMII_API_KEY = config("TERMII_API_KEY", default="")
+TERMII_SENDER_ID = config("TERMII_SENDER_ID", default="")
+TERMII_BASE_URL = config("TERMII_BASE_URL", default="https://api.ng.termii.com")
+TERMII_TIMEOUT_SECONDS = config("TERMII_TIMEOUT_SECONDS", default=10, cast=int)

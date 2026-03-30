@@ -59,6 +59,13 @@ def process_checkin(token: str, user: Optional[object] = None) -> Dict[str, Any]
                     "status_code": status.HTTP_400_BAD_REQUEST,
                 }
 
+            if guest.rsvp_status != Guest.RSVP_STATUS_ATTENDING:
+                return {
+                    "success": False,
+                    "error": "Guest has not confirmed attendance.",
+                    "status_code": status.HTTP_403_FORBIDDEN,
+                }
+
             # 2. Duplicate check-in guard
             if guest.has_checked_in:
                 return {

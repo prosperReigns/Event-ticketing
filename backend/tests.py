@@ -13,6 +13,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
 
 from events.models import Event
 from guests.models import Guest
@@ -38,12 +39,21 @@ def make_event(name="Test Event", offset_hours=-1, is_active=True):
     )
 
 
-def make_guest(event, name="Alice", email="alice@example.com", table="T1"):
+def make_guest(
+    event,
+    name="Alice",
+    email="alice@example.com",
+    table="T1",
+    rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+    is_placeholder=False,
+):
     return Guest.objects.create(
         event=event,
         name=name,
         email=email,
         table_number=table,
+        rsvp_status=rsvp_status,
+        is_placeholder=is_placeholder,
     )
 
 
@@ -146,11 +156,24 @@ class CheckInServiceTest(TestCase):
         self.assertEqual(result["status_code"], 400)
         self.assertIn("not active yet", result["error"])
 
+    def test_pending_rsvp_rejected(self):
+        pending_guest = make_guest(
+            self.event,
+            name="Pending Guest",
+            email="pending@example.com",
+            rsvp_status=Guest.RSVP_STATUS_PENDING,
+        )
+        result = process_checkin(str(pending_guest.unique_token))
+        self.assertFalse(result["success"])
+        self.assertEqual(result["status_code"], 403)
+        self.assertIn("not confirmed", result["error"])
+
 
 # ---------------------------------------------------------------------------
 # Bulk guest creation tests
 # ---------------------------------------------------------------------------
 
+@override_settings(SEND_EMAIL_ASYNC=False)
 @patch("core.services.guest_service.generate_qr_code")
 @patch("core.services.guest_service.send_guest_qr_email")
 class BulkGuestCreationTest(TestCase):
@@ -196,3 +219,59 @@ class BulkGuestCreationTest(TestCase):
         self.assertEqual(len(errors), 0)
         self.assertEqual(len(created), 1)
         self.assertEqual(created[0].table_number, "")
+
+
+@patch("core.services.guest_service.send_rsvp_sms")
+class RSVPGuestCreationTest(TestCase):
+    def setUp(self):
+        self.event = make_event()
+
+    def test_rsvp_guest_creates_placeholder(self, mock_sms):
+        data = [
+            {"name": "RSVP Guest", "phone": "+1234567890"},
+        ]
+        created, errors = bulk_create_guests(self.event, data)
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(len(created), 1)
+        guest = created[0]
+        self.assertTrue(guest.is_placeholder)
+        self.assertEqual(guest.rsvp_status, Guest.RSVP_STATUS_PENDING)
+        mock_sms.assert_called_once()
+
+
+@override_settings(
+    CHECKIN_DOMAIN="http://testserver",
+    RSVP_DOMAIN="http://testserver",
+    SECURE_SSL_REDIRECT=False,
+)
+@patch("guests.views.send_guest_qr_email")
+@patch("guests.views.generate_qr_code")
+class RSVPSubmissionTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.event = make_event()
+        self.guest = make_guest(
+            self.event,
+            name="RSVP Guest",
+            email=None,
+            rsvp_status=Guest.RSVP_STATUS_PENDING,
+            is_placeholder=True,
+        )
+
+    def test_rsvp_submission_marks_attending(self, mock_qr, mock_email):
+        response = self.client.post(
+            f"/api/rsvp/{self.guest.unique_token}/",
+            data={
+                "name": "RSVP Guest",
+                "email": "rsvp@example.com",
+                "phone": "+1234567890",
+                "rsvp_status": Guest.RSVP_STATUS_ATTENDING,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.guest.refresh_from_db()
+        self.assertEqual(self.guest.rsvp_status, Guest.RSVP_STATUS_ATTENDING)
+        self.assertFalse(self.guest.is_placeholder)
+        mock_qr.assert_called_once()
+        mock_email.assert_called_once()
