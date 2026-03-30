@@ -50,9 +50,7 @@ def _send_brevo_email(guest) -> bool:
         if os.path.exists(qr_path):
             with open(qr_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
-            attachments = [{"content": encoded, "name": "qr_code.png"}]
-            payload["attachment"] = attachments
-            payload["attachments"] = attachments
+            payload["attachment"] = [{"content": encoded, "name": "qr_code.png"}]
 
     data = json.dumps(payload).encode("utf-8")
     headers = {

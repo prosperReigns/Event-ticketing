@@ -71,8 +71,8 @@ class BulkGuestCreateSerializer(serializers.Serializer):
 
 
 class RSVPSubmissionSerializer(serializers.Serializer):
-    name = serializers.CharField(required=False, allow_blank=False)
-    email = serializers.EmailField(required=False, allow_blank=False)
+    name = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(required=False, allow_blank=True)
     rsvp_status = serializers.ChoiceField(choices=Guest.RSVP_STATUS_CHOICES)
 
