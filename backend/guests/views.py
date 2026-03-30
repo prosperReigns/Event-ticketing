@@ -107,7 +107,7 @@ class RSVPView(APIView):
         rsvp_status = data["rsvp_status"]
         name = data.get("name") or guest.name
         phone = data.get("phone", guest.phone) or ""
-        email = data.get("email") or guest.email
+        email = data.get("email", guest.email)
 
         if rsvp_status == Guest.RSVP_STATUS_ATTENDING and not email:
             return Response(
