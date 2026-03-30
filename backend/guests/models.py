@@ -19,7 +19,7 @@ class Guest(models.Model):
     name = models.CharField(max_length=255)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=30, blank=True, default="")
-    table_number = models.CharField(max_length=50)
+    table_number = models.CharField(max_length=50, blank=True, default="")
     unique_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
     qr_code_image = models.ImageField(upload_to="qr_codes/", blank=True, null=True)
     has_checked_in = models.BooleanField(default=False)

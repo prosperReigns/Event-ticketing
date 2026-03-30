@@ -66,11 +66,19 @@ def bulk_create_guests(
         table_number = str(data.get("table_number", "")).strip()
         phone = str(data.get("phone", "")).strip()
 
-        if not name or (not email and not phone):
+        if not name:
             errors.append(
                 {
                     "email": email or None,
-                    "error": "Each guest must include name and either email or phone.",
+                    "error": "Each guest must include a name.",
+                }
+            )
+            continue
+        if not email and not phone:
+            errors.append(
+                {
+                    "email": None,
+                    "error": "Each guest must include an email or phone number.",
                 }
             )
             continue
