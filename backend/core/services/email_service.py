@@ -67,10 +67,7 @@ def _send_brevo_email(guest) -> bool:
                 return True
             logger.error("Brevo returned status %s for %s", response.status, guest.email)
             return False
-    except error.HTTPError as exc:
-        logger.error("Brevo HTTP error %s for %s", exc.code, guest.email)
-        return False
-    except Exception as exc:  # noqa: BLE001
+    except (error.HTTPError, error.URLError, TimeoutError, OSError, ValueError) as exc:
         logger.exception("Failed to send Brevo email to %s: %s", guest.email, exc)
         return False
 

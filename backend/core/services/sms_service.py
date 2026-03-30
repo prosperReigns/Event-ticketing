@@ -42,9 +42,6 @@ def send_rsvp_sms(guest, rsvp_url: str) -> bool:
                 return True
             logger.error("Termii returned status %s for %s", response.status, guest.phone)
             return False
-    except error.HTTPError as exc:
-        logger.error("Termii HTTP error %s for %s", exc.code, guest.phone)
-        return False
-    except Exception as exc:  # noqa: BLE001
+    except (error.HTTPError, error.URLError, TimeoutError, OSError, ValueError) as exc:
         logger.exception("Failed to send RSVP SMS to %s: %s", guest.phone, exc)
         return False

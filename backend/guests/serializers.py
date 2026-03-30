@@ -52,7 +52,7 @@ class GuestSerializer(serializers.ModelSerializer):
 
 
 class BulkGuestCreateSerializer(serializers.Serializer):
-    """Accepts a list of guest objects for bulk creation."""
+    """Accepts a list of guest objects for bulk creation (email or phone)."""
 
     guests = serializers.ListField(
         child=serializers.DictField(),

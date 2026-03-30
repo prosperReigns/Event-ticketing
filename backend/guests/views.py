@@ -140,12 +140,14 @@ class RSVPView(APIView):
         )
 
         if guest.rsvp_status == Guest.RSVP_STATUS_ATTENDING:
-            try:
-                if not guest.qr_code_image:
+            if not guest.qr_code_image:
+                try:
                     generate_qr_code(guest)
-                send_guest_qr_email(guest)
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("RSVP confirmation email failed for guest %s: %s", guest.id, exc)
+                except (OSError, ValueError) as exc:
+                    logger.exception(
+                        "RSVP QR generation failed for guest %s: %s", guest.id, exc
+                    )
+            send_guest_qr_email(guest)
 
         response = GuestSerializer(guest, context={"request": request})
         return Response(response.data, status=status.HTTP_200_OK)
