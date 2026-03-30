@@ -1,5 +1,5 @@
 """
-Email service using SendGrid.
+Email service using Brevo (primary) with SendGrid fallback.
 
 Provides a single public function:
     send_guest_qr_email(guest) -> bool
@@ -9,6 +9,8 @@ import logging
 import base64
 import os
 import html
+import json
+from urllib import request, error
 
 from django.conf import settings
 
@@ -17,13 +19,66 @@ logger = logging.getLogger(__name__)
 
 def send_guest_qr_email(guest) -> bool:
     """
-    Send the QR-code invitation email to *guest* via SendGrid.
+    Send the QR-code invitation email to *guest*.
 
     Returns True on success, False on failure (logs the error).
     """
+    if not guest.email:
+        logger.warning("Guest %s has no email; skipping invitation.", guest.id)
+        return False
+
+    if settings.BREVO_API_KEY:
+        return _send_brevo_email(guest)
+
+    return _send_sendgrid_email(guest)
+
+
+def _send_brevo_email(guest) -> bool:
+    html_content = _build_html_content(guest)
+    payload = {
+        "sender": {
+            "email": settings.BREVO_SENDER_EMAIL,
+            "name": settings.BREVO_SENDER_NAME or settings.BREVO_SENDER_EMAIL,
+        },
+        "to": [{"email": guest.email, "name": guest.name}],
+        "subject": f"Your Invitation to {guest.event.name}",
+        "htmlContent": html_content,
+    }
+
+    if guest.qr_code_image:
+        qr_path = guest.qr_code_image.path
+        if os.path.exists(qr_path):
+            with open(qr_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode()
+            payload["attachment"] = [{"content": encoded, "name": "qr_code.png"}]
+
+    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "api-key": settings.BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "accept": "application/json",
+    }
+    req = request.Request(settings.BREVO_EMAIL_URL, data=data, headers=headers, method="POST")
+
+    try:
+        with request.urlopen(req, timeout=settings.BREVO_TIMEOUT_SECONDS) as response:
+            if response.status in (200, 201, 202):
+                logger.info("Brevo email sent to %s (status %s)", guest.email, response.status)
+                return True
+            logger.error("Brevo returned status %s for %s", response.status, guest.email)
+            return False
+    except error.HTTPError as exc:
+        logger.error("Brevo HTTP error %s for %s", exc.code, guest.email)
+        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to send Brevo email to %s: %s", guest.email, exc)
+        return False
+
+
+def _send_sendgrid_email(guest) -> bool:
     api_key = settings.SENDGRID_API_KEY
     if not api_key:
-        logger.warning("SENDGRID_API_KEY is not configured – skipping email for %s", guest.email)
+        logger.warning("Email providers not configured – skipping email for %s", guest.email)
         return False
 
     try:
