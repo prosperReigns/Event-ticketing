@@ -103,7 +103,7 @@ def bulk_create_guests(
             continue
 
         try:
-            is_placeholder = not bool(email)
+            is_placeholder = not email
             rsvp_status = (
                 Guest.RSVP_STATUS_PENDING
                 if is_placeholder

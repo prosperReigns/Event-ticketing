@@ -143,7 +143,7 @@ class RSVPView(APIView):
             if not guest.qr_code_image:
                 try:
                     generate_qr_code(guest)
-                except Exception as exc:  # noqa: BLE001
+                except (OSError, ValueError) as exc:
                     logger.exception(
                         "RSVP QR generation failed for guest %s: %s", guest.id, exc
                     )
