@@ -65,6 +65,12 @@ const EventDetails = () => {
               View Guests
             </Link>
             <Link
+              to={`/events/${id}/guests/view`}
+              className="rounded-full border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+            >
+              Guest Check-in List
+            </Link>
+            <Link
               to={`/events/${id}/guests#add`}
               className="rounded-full border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
             >
