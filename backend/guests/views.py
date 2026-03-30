@@ -81,6 +81,7 @@ class RSVPView(APIView):
     authentication_classes = []
 
     def _get_guest(self, token):
+        """Return guest by RSVP token with related event, or None if missing."""
         try:
             return Guest.objects.select_related("event").get(unique_token=token)
         except Guest.DoesNotExist:

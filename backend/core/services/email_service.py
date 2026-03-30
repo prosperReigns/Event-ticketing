@@ -73,6 +73,7 @@ def _send_brevo_email(guest) -> bool:
 
 
 def _send_sendgrid_email(guest) -> bool:
+    """Send the invitation email via SendGrid as a fallback provider."""
     api_key = settings.SENDGRID_API_KEY
     if not api_key:
         logger.warning("Email providers not configured – skipping email for %s", guest.email)

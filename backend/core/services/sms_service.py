@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_rsvp_sms(guest, rsvp_url: str) -> bool:
+    """Send an RSVP link SMS to the guest via Termii."""
     if not guest.phone:
         logger.warning("Guest %s has no phone number; skipping RSVP SMS.", guest.id)
         return False
