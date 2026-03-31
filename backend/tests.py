@@ -4,6 +4,7 @@ Tests for the Event Guest QR Check-in System.
 Uses SQLite in-memory DB for speed; no real email calls.
 """
 
+import os
 import uuid
 from pathlib import Path
 import tempfile
@@ -13,8 +14,10 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from rest_framework import status
 from rest_framework.test import APIClient
 
+from event_checkin.settings.base import env_list
 from events.models import Event
 from guests.models import Guest
 from checkins.models import CheckInLog
@@ -55,6 +58,16 @@ def make_guest(
         rsvp_status=rsvp_status,
         is_placeholder=is_placeholder,
     )
+
+
+class EnvListHelperTest(TestCase):
+    def test_env_list_parses_csv(self):
+        with patch.dict(os.environ, {"TEST_CSV": " a, b , ,c "}):
+            self.assertEqual(env_list("TEST_CSV"), ["a", "b", "c"])
+
+    def test_env_list_empty(self):
+        with patch.dict(os.environ, {"TEST_EMPTY": ""}):
+            self.assertEqual(env_list("TEST_EMPTY"), [])
 
 
 # ---------------------------------------------------------------------------
@@ -275,3 +288,18 @@ class RSVPSubmissionTest(TestCase):
         self.assertFalse(self.guest.is_placeholder)
         mock_qr.assert_called_once()
         mock_email.assert_called_once()
+
+
+class EventApiCsrfTest(TestCase):
+    def test_event_post_allows_unauthenticated_access(self):
+        client = APIClient(enforce_csrf_checks=True)
+        response = client.post(
+            "/api/events/",
+            data={
+                "name": "CSRF Safe Event",
+                "location": "Test Venue",
+                "start_datetime": timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

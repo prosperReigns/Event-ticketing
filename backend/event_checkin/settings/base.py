@@ -23,6 +23,22 @@ def env_bool(name: str, default: bool = False) -> bool:
         return False
     return default
 
+
+def env_list(name: str, default: str = "") -> list[str]:
+    raw = config(name, default=default)
+    return [item.strip() for item in str(raw).split(",") if item.strip()]
+
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
+    if host.strip()
+]
+render_host = config("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if render_host:
+    # Render sets this env var; adding it avoids DisallowedHost 400s.
+    ALLOWED_HOSTS.append(render_host)
+
 DEBUG = env_bool("DEBUG", default=False)
 # Installed apps
 INSTALLED_APPS = [
@@ -43,9 +59,9 @@ INSTALLED_APPS = [
 
 # Middleware
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Keep before CommonMiddleware for 4xx CORS headers.
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -88,6 +104,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Internationalization
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = config("TIME_ZONE", default="Africa/Lagos")
+USE_I18N = True
+USE_TZ = True
 
 # Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

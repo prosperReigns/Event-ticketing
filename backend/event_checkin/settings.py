@@ -5,6 +5,7 @@ Django settings for event_checkin project.
 from pathlib import Path
 
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,13 +25,27 @@ def env_bool(name: str, default: bool = False) -> bool:
     return default
 
 
+def env_list(name: str, default: str = "") -> list[str]:
+    raw = config(name, default=default)
+    return [item.strip() for item in str(raw).split(",") if item.strip()]
+
+
 DEBUG = env_bool("DEBUG", default=False)
-SECRET_KEY = config("SECRET_KEY", default=get_random_secret_key())
+SECRET_KEY = config("SECRET_KEY", default="")
+if not SECRET_KEY and DEBUG:
+    # Only fall back to a generated key for local development.
+    SECRET_KEY = get_random_secret_key()
+if not SECRET_KEY and not DEBUG:
+    raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is False.")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
     if host.strip()
 ]
+render_host = config("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if render_host:
+    # Render sets this env var; adding it avoids DisallowedHost 400s in production.
+    ALLOWED_HOSTS.append(render_host)
 
 # Application definition
 INSTALLED_APPS = [
@@ -52,7 +67,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Keep early in the stack for 4xx CORS headers.
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -150,23 +165,16 @@ REST_FRAMEWORK = {
 
 # CORS / CSRF
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in config(
-        "CORS_ALLOWED_ORIGINS",
-        default="http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",")
-    if origin.strip()
-]
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in config(
-        "CSRF_TRUSTED_ORIGINS",
-        default="http://localhost:5173,http://127.0.0.1:5173",
-    ).split(",")
-    if origin.strip()
-]
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:5173,http://127.0.0.1:5173",
+)
+_csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
+if not _csrf_trusted_origins:
+    _csrf_trusted_origins = CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = _csrf_trusted_origins
+# Allow cookies/CSRF tokens across the frontend domain only when explicitly enabled.
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
@@ -175,6 +183,10 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=True)
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    if CORS_ALLOW_CREDENTIALS:
+        # Cross-site cookies require SameSite=None in production to prevent CSRF breaks.
+        SESSION_COOKIE_SAMESITE = "None"
+        CSRF_COOKIE_SAMESITE = "None"
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
 
