@@ -1,5 +1,4 @@
 asgiref==3.8.1
-backports.zoneinfo==0.2.1
 build==1.2.2.post1
 cffi==2.0.0
 click==8.1.8
