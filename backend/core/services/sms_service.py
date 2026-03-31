@@ -48,7 +48,7 @@ class BulkSMSProvider(SMSProvider):
                 logger.info("BulkSMS message sent to %s", phone_number)
             else:
                 logger.error("BulkSMS message failed for %s", phone_number)
-        return bool(results) and all(results)
+        return all(results)
 
 
 def _normalize_phone(value: str) -> str:
@@ -128,10 +128,9 @@ def send_whatsapp_message(
     media_caption: Optional[str] = None,
 ) -> bool:
     """BulkSMS Nigeria does not support WhatsApp messaging."""
-    guest_id = getattr(guest, "id", "unknown")
     logger.warning(
         "WhatsApp messaging is not supported by the BulkSMS provider (guest %s).",
-        guest_id,
+        guest.id,
     )
     return False
 
