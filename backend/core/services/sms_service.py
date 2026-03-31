@@ -71,10 +71,6 @@ def _get_timeout_seconds() -> int:
 
 
 def _send_bulksms_request(payload: dict, url: str) -> bool:
-    if not settings.BULKSMS_API_TOKEN:
-        logger.warning("BULKSMS_API_TOKEN is not configured; skipping SMS request.")
-        return False
-
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
