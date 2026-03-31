@@ -59,9 +59,9 @@ def _mask_phone(value: str) -> str:
     digits = _normalize_phone(value)
     if not digits:
         return "unknown"
-    if len(digits) <= 4:
+    if len(digits) <= 2:
         return "*" * len(digits)
-    return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
+    return f"{'*' * (len(digits) - 2)}{digits[-2:]}"
 
 
 def _get_sms_provider() -> Optional[SMSProvider]:
