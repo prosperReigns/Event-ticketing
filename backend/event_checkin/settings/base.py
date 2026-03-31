@@ -23,7 +23,8 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in str(raw).split(",") if item.strip()]
 
 
-SECRET_KEY = config("SECRET_KEY", default=get_random_secret_key())
+# Set via environment in production; dev settings provide a safe fallback.
+SECRET_KEY = config("SECRET_KEY", default="")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")

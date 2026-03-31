@@ -279,7 +279,7 @@ class RSVPSubmissionTest(TestCase):
 
 
 class EventApiCsrfTest(TestCase):
-    def test_event_post_does_not_require_csrf(self):
+    def test_event_post_allows_unauthenticated_access(self):
         client = APIClient(enforce_csrf_checks=True)
         response = client.post(
             "/api/events/",

@@ -19,6 +19,7 @@ class EventViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
 
     def get_throttles(self):
+        # Writes still use global throttle rates to reduce abuse.
         if self.request.method in {"GET", "HEAD", "OPTIONS"}:
             return []
         return super().get_throttles()

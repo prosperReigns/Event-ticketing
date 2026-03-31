@@ -30,7 +30,10 @@ def env_list(name: str, default: str = "") -> list[str]:
 
 
 DEBUG = env_bool("DEBUG", default=False)
-SECRET_KEY = config("SECRET_KEY", default=get_random_secret_key())
+SECRET_KEY = config("SECRET_KEY", default="")
+if not SECRET_KEY and DEBUG:
+    # Only fall back to a generated key for local development.
+    SECRET_KEY = get_random_secret_key()
 ALLOWED_HOSTS = [
     host.strip()
     for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
