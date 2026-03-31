@@ -163,9 +163,12 @@ CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:5173,http://127.0.0.1:5173",
 )
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS") or CORS_ALLOWED_ORIGINS
-# Allow cookies/CSRF tokens across the frontend domain when explicitly enabled.
-CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=True)
+csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
+if not csrf_trusted_origins:
+    csrf_trusted_origins = CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = csrf_trusted_origins
+# Allow cookies/CSRF tokens across the frontend domain only when explicitly enabled.
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)

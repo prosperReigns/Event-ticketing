@@ -126,9 +126,12 @@ CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:5173,http://127.0.0.1:5173",
 )
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS") or CORS_ALLOWED_ORIGINS
-# Allow credentials so CSRF tokens/cookies can flow to the frontend domain.
-CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=True)
+csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
+if not csrf_trusted_origins:
+    csrf_trusted_origins = CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = csrf_trusted_origins
+# Only allow credentials when explicitly enabled for cross-site requests.
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
 # Email / 3rd party integrations can stay here
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
