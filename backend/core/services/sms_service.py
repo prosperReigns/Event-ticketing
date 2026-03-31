@@ -83,7 +83,7 @@ def _send_bulksms_request(payload: dict, url: str) -> bool:
     data = json.dumps(payload).encode("utf-8")
     headers = {
         "Content-Type": "application/json",
-        "Accept": "application/json",
+        "accept": "application/json",
         "Authorization": f"Bearer {settings.BULKSMS_API_TOKEN}",
     }
     req = request.Request(url, data=data, headers=headers, method="POST")
