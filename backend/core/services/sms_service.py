@@ -45,14 +45,23 @@ class BulkSMSProvider(SMSProvider):
             success = _send_bulksms_request(payload, self.url)
             results.append(success)
             if success:
-                logger.info("BulkSMS message sent to %s", phone_number)
+                logger.info("BulkSMS message sent to %s", _mask_phone(phone_number))
             else:
-                logger.error("BulkSMS message failed for %s", phone_number)
+                logger.error("BulkSMS message failed for %s", _mask_phone(phone_number))
         return all(results)
 
 
 def _normalize_phone(value: str) -> str:
     return re.sub(r"\D", "", value or "")
+
+
+def _mask_phone(value: str) -> str:
+    digits = _normalize_phone(value)
+    if not digits:
+        return "unknown"
+    if len(digits) <= 4:
+        return "*" * len(digits)
+    return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
 
 
 def _get_sms_provider() -> Optional[SMSProvider]:
@@ -82,7 +91,7 @@ def _send_bulksms_request(payload: dict, url: str) -> bool:
     try:
         with request.urlopen(req, timeout=_get_timeout_seconds()) as response:
             response_body = response.read().decode()
-            logger.info("BulkSMS response: %s", response_body)
+            logger.debug("BulkSMS response received (%s bytes).", len(response_body))
             if 200 <= response.status < 300:
                 logger.info("BulkSMS request succeeded (status %s).", response.status)
                 return True
@@ -111,9 +120,9 @@ def send_rsvp_sms(guest, rsvp_url: str) -> bool:
     message = f"Hi {guest.name}, please RSVP here: {rsvp_url}"
     success = provider.send_sms(normalized_phone, message)
     if success:
-        logger.info("RSVP SMS sent to %s", guest.phone)
+        logger.info("RSVP SMS sent to %s", _mask_phone(guest.phone))
     else:
-        logger.error("Failed to send RSVP SMS to %s", guest.phone)
+        logger.error("Failed to send RSVP SMS to %s", _mask_phone(guest.phone))
     return success
 
 
