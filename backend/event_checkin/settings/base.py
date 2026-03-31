@@ -53,7 +53,7 @@ INSTALLED_APPS = [
 # Middleware
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # Keep before WhiteNoise so CORS headers appear on early 4xxs.
+    "corsheaders.middleware.CorsMiddleware",  # Keep early in the stack for 4xx CORS headers.
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
