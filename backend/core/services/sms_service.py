@@ -1,57 +1,105 @@
 """
-SMS service using Termii.
+SMS service using BulkSMS Nigeria with a provider pattern.
 """
 
 import json
 import logging
 import re
 from typing import Iterable, Optional
-from urllib import request, error
+from urllib import error, request
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+BULKSMS_SANDBOX_URL = "https://www.bulksmsnigeria.com/api/sandbox/v2/sms"
+BULKSMS_PRODUCTION_URL = "https://www.bulksmsnigeria.com/api/v2/sms"
+
+
+class SMSProvider:
+    def send_sms(self, phone_number: str, message: str) -> bool:
+        raise NotImplementedError
+
+    def send_bulk_sms(self, phone_numbers: Iterable[str], message: str) -> bool:
+        raise NotImplementedError
+
+
+class BulkSMSProvider(SMSProvider):
+    def __init__(self, sender_id: str, use_sandbox: bool) -> None:
+        self.sender_id = sender_id
+        self.url = BULKSMS_SANDBOX_URL if use_sandbox else BULKSMS_PRODUCTION_URL
+
+    def send_sms(self, phone_number: str, message: str) -> bool:
+        payload = {"from": self.sender_id, "to": phone_number, "body": message}
+        return _send_bulksms_request(payload, self.url)
+
+    def send_bulk_sms(self, phone_numbers: Iterable[str], message: str) -> bool:
+        results = []
+        for phone_number in phone_numbers:
+            payload = {"from": self.sender_id, "to": phone_number, "body": message}
+            success = _send_bulksms_request(payload, self.url)
+            results.append(success)
+            if success:
+                logger.info("BulkSMS message sent to %s", phone_number)
+            else:
+                logger.error("BulkSMS message failed for %s", phone_number)
+        return bool(results) and all(results)
 
 
 def _normalize_phone(value: str) -> str:
     return re.sub(r"\D", "", value or "")
 
 
-def _build_termii_url(path_suffix: str, override_url: str) -> str:
-    if override_url:
-        return override_url
-    base_url = settings.TERMII_BASE_URL.rstrip("/")
-    if base_url.endswith("/api"):
-        return f"{base_url}/{path_suffix.lstrip('/')}"
-    return f"{base_url}/api/{path_suffix.lstrip('/')}"
+def _get_sms_provider() -> Optional[SMSProvider]:
+    provider_name = getattr(settings, "SMS_PROVIDER", "bulksms").lower()
+    if provider_name != "bulksms":
+        logger.warning("Unsupported SMS provider '%s'.", provider_name)
+        return None
+    if not settings.BULKSMS_API_TOKEN or not settings.BULKSMS_SENDER_ID:
+        logger.warning("BulkSMS settings are not configured; skipping SMS.")
+        return None
+    return BulkSMSProvider(settings.BULKSMS_SENDER_ID, use_sandbox=settings.DEBUG)
 
 
-def _send_termii_request(payload: dict, url: str, success_label: str) -> bool:
+def _get_timeout_seconds() -> int:
+    return getattr(settings, "BULKSMS_TIMEOUT_SECONDS", 10)
+
+
+def _send_bulksms_request(payload: dict, url: str) -> bool:
+    if not settings.BULKSMS_API_TOKEN:
+        logger.warning("BULKSMS_API_TOKEN is not configured; skipping SMS request.")
+        return False
+
     data = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json", "accept": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {settings.BULKSMS_API_TOKEN}",
+    }
     req = request.Request(url, data=data, headers=headers, method="POST")
 
     try:
-        with request.urlopen(req, timeout=settings.TERMII_TIMEOUT_SECONDS) as response:
+        with request.urlopen(req, timeout=_get_timeout_seconds()) as response:
             response_body = response.read().decode()
-            logger.info("Termii response: %s", response_body)
-            if response.status in (200, 201, 202):
-                logger.info("%s (status %s)", success_label, response.status)
+            logger.info("BulkSMS response: %s", response_body)
+            if 200 <= response.status < 300:
+                logger.info("BulkSMS request succeeded (status %s).", response.status)
                 return True
-            logger.error("Termii returned status %s for request to %s", response.status, url)
+            logger.error("BulkSMS returned status %s for request to %s", response.status, url)
             return False
     except (error.HTTPError, error.URLError, TimeoutError, OSError, ValueError) as exc:
-        logger.exception("Failed to call Termii (%s): %s", url, exc)
+        logger.exception("Failed to call BulkSMS (%s): %s", url, exc)
         return False
 
 
 def send_rsvp_sms(guest, rsvp_url: str) -> bool:
-    """Send an RSVP link SMS to the guest via Termii."""
+    """Send an RSVP link SMS to the guest via BulkSMS Nigeria."""
     if not guest.phone:
         logger.warning("Guest %s has no phone number; skipping RSVP SMS.", guest.id)
         return False
-    if not settings.TERMII_API_KEY or not settings.TERMII_SENDER_ID:
-        logger.warning("TERMII settings are not configured; skipping RSVP SMS to %s", guest.phone)
+
+    provider = _get_sms_provider()
+    if not provider:
         return False
 
     normalized_phone = _normalize_phone(guest.phone or "")
@@ -59,22 +107,13 @@ def send_rsvp_sms(guest, rsvp_url: str) -> bool:
         logger.warning("Guest %s phone could not be normalized; skipping RSVP SMS.", guest.id)
         return False
 
-    payload = {
-        "api_key": settings.TERMII_API_KEY,
-        "to": normalized_phone,
-        "from": settings.TERMII_SENDER_ID,
-        "sms": (
-            f"Hi {guest.name}, please RSVP for {guest.event.name} using this link: {rsvp_url}"
-        ),
-        "type": "plain",
-        "channel": "generic",
-    }
-    url = "https://v3.api.termii.com/api/sms/send"
-    return _send_termii_request(
-        payload,
-        url,
-        f"RSVP SMS sent to {guest.phone}",
-    )
+    message = f"Hi {guest.name}, please RSVP here: {rsvp_url}"
+    success = provider.send_sms(normalized_phone, message)
+    if success:
+        logger.info("RSVP SMS sent to %s", guest.phone)
+    else:
+        logger.error("Failed to send RSVP SMS to %s", guest.phone)
+    return success
 
 
 def send_whatsapp_message(
@@ -83,77 +122,31 @@ def send_whatsapp_message(
     media_url: Optional[str] = None,
     media_caption: Optional[str] = None,
 ) -> bool:
-    """Send a WhatsApp conversational message to the guest via Termii."""
-    if not guest.phone:
-        logger.warning("Guest %s has no phone number; skipping WhatsApp message.", guest.id)
-        return False
-    if not settings.TERMII_API_KEY or not settings.TERMII_SENDER_ID:
-        logger.warning(
-            "TERMII settings are not configured; skipping WhatsApp to %s", guest.phone
-        )
-        return False
-
-    normalized_phone = _normalize_phone(guest.phone or "")
-    if not normalized_phone:
-        logger.warning(
-            "Guest %s phone could not be normalized; skipping WhatsApp message.", guest.id
-        )
-        return False
-
-    payload = {
-        "api_key": settings.TERMII_API_KEY,
-        "to": normalized_phone,
-        "from": settings.TERMII_SENDER_ID,
-        "type": "plain",
-        "channel": "whatsapp",
-    }
-
-    if media_url:
-        media_payload = {"url": media_url}
-        if media_caption:
-            media_payload["caption"] = media_caption
-        payload["media"] = media_payload
-    else:
-        payload["sms"] = message
-
-    url = _build_termii_url("sms/send", settings.TERMII_SMS_SEND_URL.strip())
-    return _send_termii_request(
-        payload,
-        url,
-        f"WhatsApp message sent to {guest.phone}",
+    """BulkSMS Nigeria does not support WhatsApp messaging."""
+    guest_id = getattr(guest, "id", "unknown")
+    logger.warning(
+        "WhatsApp messaging is not supported by the BulkSMS provider (guest %s).",
+        guest_id,
     )
+    return False
 
 
-def send_bulk_sms(
-    phone_numbers: Iterable[str],
-    message: str,
-    channel: str = "generic",
-) -> bool:
-    """Send a bulk SMS message via Termii."""
+def send_bulk_sms(phone_numbers: Iterable[str], message: str) -> bool:
+    """Send a bulk SMS message via BulkSMS Nigeria."""
     numbers = [_normalize_phone(value) for value in phone_numbers]
     numbers = [value for value in numbers if value]
 
     if not numbers:
         logger.warning("No valid phone numbers provided for bulk SMS.")
         return False
-    if len(numbers) > 100:
-        logger.warning("Bulk SMS supports up to 100 phone numbers per request.")
-        return False
-    if channel not in {"generic", "dnd"}:
-        logger.warning("Invalid bulk SMS channel '%s'; use 'generic' or 'dnd'.", channel)
-        return False
-    if not settings.TERMII_API_KEY or not settings.TERMII_SENDER_ID:
-        logger.warning("TERMII settings are not configured; skipping bulk SMS.")
+
+    provider = _get_sms_provider()
+    if not provider:
         return False
 
-    payload = {
-        "api_key": settings.TERMII_API_KEY,
-        "to": numbers,
-        "from": settings.TERMII_SENDER_ID,
-        "sms": message,
-        "type": "plain",
-        "channel": channel,
-    }
-
-    url = _build_termii_url("sms/send/bulk", settings.TERMII_SMS_BULK_URL.strip())
-    return _send_termii_request(payload, url, "Bulk SMS sent successfully")
+    success = provider.send_bulk_sms(numbers, message)
+    if success:
+        logger.info("BulkSMS messages sent successfully (%s recipients).", len(numbers))
+    else:
+        logger.error("BulkSMS bulk send completed with failures.")
+    return success
