@@ -4,6 +4,7 @@ Tests for the Event Guest QR Check-in System.
 Uses SQLite in-memory DB for speed; no real email calls.
 """
 
+import os
 import uuid
 from pathlib import Path
 import tempfile
@@ -56,6 +57,20 @@ def make_guest(
         rsvp_status=rsvp_status,
         is_placeholder=is_placeholder,
     )
+
+
+class EnvListHelperTest(TestCase):
+    def test_env_list_parses_csv(self):
+        from event_checkin.settings import base as base_settings
+
+        with patch.dict(os.environ, {"TEST_CSV": " a, b , ,c "}):
+            self.assertEqual(base_settings.env_list("TEST_CSV"), ["a", "b", "c"])
+
+    def test_env_list_empty(self):
+        from event_checkin.settings import base as base_settings
+
+        with patch.dict(os.environ, {"TEST_EMPTY": ""}):
+            self.assertEqual(base_settings.env_list("TEST_EMPTY"), [])
 
 
 # ---------------------------------------------------------------------------

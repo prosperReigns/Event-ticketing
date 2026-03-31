@@ -13,7 +13,7 @@ class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
-    # Public API endpoint until auth is enabled; avoid session CSRF checks for cross-origin POSTs.
+    # Public API endpoint; avoid session CSRF checks for cross-origin POSTs.
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]

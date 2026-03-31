@@ -23,8 +23,6 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in str(raw).split(",") if item.strip()]
 
 
-# Set via environment in production; dev settings provide a safe fallback.
-SECRET_KEY = config("SECRET_KEY", default="")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
@@ -127,10 +125,10 @@ CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS",
     default="http://localhost:5173,http://127.0.0.1:5173",
 )
-csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
-if not csrf_trusted_origins:
-    csrf_trusted_origins = CORS_ALLOWED_ORIGINS
-CSRF_TRUSTED_ORIGINS = csrf_trusted_origins
+_csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
+if not _csrf_trusted_origins:
+    _csrf_trusted_origins = CORS_ALLOWED_ORIGINS
+CSRF_TRUSTED_ORIGINS = _csrf_trusted_origins
 # Only allow credentials when explicitly enabled for cross-site requests.
 CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=False)
 
