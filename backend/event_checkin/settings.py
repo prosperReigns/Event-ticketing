@@ -200,3 +200,8 @@ TERMII_BASE_URL = config("TERMII_BASE_URL", default="https://api.ng.termii.com")
 TERMII_SMS_SEND_URL = config("TERMII_SMS_SEND_URL", default="")
 TERMII_SMS_BULK_URL = config("TERMII_SMS_BULK_URL", default="")
 TERMII_TIMEOUT_SECONDS = config("TERMII_TIMEOUT_SECONDS", default=10, cast=int)
+
+# BulkSMS Nigeria
+BULKSMS_API_TOKEN = config("BULKSMS_API_TOKEN", default="")
+BULKSMS_SENDER_ID = config("BULKSMS_SENDER_ID", default="")
+SMS_PROVIDER = config("SMS_PROVIDER", default="bulksms")
