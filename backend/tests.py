@@ -17,6 +17,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from event_checkin.settings.base import env_list
 from events.models import Event
 from guests.models import Guest
 from checkins.models import CheckInLog
@@ -61,16 +62,12 @@ def make_guest(
 
 class EnvListHelperTest(TestCase):
     def test_env_list_parses_csv(self):
-        from event_checkin.settings import base as base_settings
-
         with patch.dict(os.environ, {"TEST_CSV": " a, b , ,c "}):
-            self.assertEqual(base_settings.env_list("TEST_CSV"), ["a", "b", "c"])
+            self.assertEqual(env_list("TEST_CSV"), ["a", "b", "c"])
 
     def test_env_list_empty(self):
-        from event_checkin.settings import base as base_settings
-
         with patch.dict(os.environ, {"TEST_EMPTY": ""}):
-            self.assertEqual(base_settings.env_list("TEST_EMPTY"), [])
+            self.assertEqual(env_list("TEST_EMPTY"), [])
 
 
 # ---------------------------------------------------------------------------
