@@ -17,6 +17,23 @@ def env_bool(name: str, default: bool = False) -> bool:
         return False
     return default
 
+
+def env_list(name: str, default: str = "") -> list[str]:
+    raw = config(name, default=default)
+    return [item.strip() for item in str(raw).split(",") if item.strip()]
+
+
+SECRET_KEY = config("SECRET_KEY", default=get_random_secret_key())
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
+    if host.strip()
+]
+render_host = config("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if render_host:
+    # Render sets this env var; adding it avoids DisallowedHost 400s.
+    ALLOWED_HOSTS.append(render_host)
+
 # Installed apps
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -36,9 +53,9 @@ INSTALLED_APPS = [
 
 # Middleware
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # Ensure CORS headers even on early 4xx responses.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -74,6 +91,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Internationalization
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = config("TIME_ZONE", default="Africa/Lagos")
+USE_I18N = True
+USE_TZ = True
+
 # Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -97,5 +120,40 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "30/min", "user": "120/min"},
 }
 
+# CORS / CSRF defaults (override in dev/prod as needed)
+CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:5173,http://127.0.0.1:5173",
+)
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS") or CORS_ALLOWED_ORIGINS
+# Allow credentials so CSRF tokens/cookies can flow to the frontend domain.
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=True)
+
 # Email / 3rd party integrations can stay here
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+SEND_EMAIL_ASYNC = env_bool("SEND_EMAIL_ASYNC", default=True)
+BREVO_API_KEY = config("BREVO_API_KEY", default="")
+BREVO_SENDER_EMAIL = config("BREVO_SENDER_EMAIL", default=DEFAULT_FROM_EMAIL)
+BREVO_SENDER_NAME = config("BREVO_SENDER_NAME", default="")
+BREVO_TIMEOUT_SECONDS = config("BREVO_TIMEOUT_SECONDS", default=10, cast=int)
+BREVO_EMAIL_URL = config(
+    "BREVO_EMAIL_URL", default="https://api.brevo.com/v3/smtp/email"
+)
+
+# QR Code / domain for check-in URL
+CHECKIN_DOMAIN = config("CHECKIN_DOMAIN", default="http://127.0.0.1:8000")
+RSVP_DOMAIN = config("RSVP_DOMAIN", default=CHECKIN_DOMAIN)
+
+# Termii
+TERMII_API_KEY = config("TERMII_API_KEY", default="")
+TERMII_SENDER_ID = config("TERMII_SENDER_ID", default="")
+TERMII_BASE_URL = config("TERMII_BASE_URL", default="https://api.ng.termii.com")
+TERMII_SMS_SEND_URL = config("TERMII_SMS_SEND_URL", default="")
+TERMII_SMS_BULK_URL = config("TERMII_SMS_BULK_URL", default="")
+TERMII_TIMEOUT_SECONDS = config("TERMII_TIMEOUT_SECONDS", default=10, cast=int)
+
+# BulkSMS Nigeria
+BULKSMS_API_TOKEN = config("BULKSMS_API_TOKEN", default="")
+BULKSMS_SENDER_ID = config("BULKSMS_SENDER_ID", default="")
+SMS_PROVIDER = config("SMS_PROVIDER", default="bulksms")

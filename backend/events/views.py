@@ -13,6 +13,8 @@ class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    # Public API endpoint: avoid session auth/CSRF checks for cross-origin POSTs.
+    authentication_classes = []
     http_method_names = ["get", "post", "put", "patch", "delete", "head", "options"]
 
     def get_throttles(self):

@@ -13,6 +13,7 @@ from unittest.mock import patch
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from rest_framework import status
 from rest_framework.test import APIClient
 
 from events.models import Event
@@ -275,3 +276,18 @@ class RSVPSubmissionTest(TestCase):
         self.assertFalse(self.guest.is_placeholder)
         mock_qr.assert_called_once()
         mock_email.assert_called_once()
+
+
+class EventApiCsrfTest(TestCase):
+    def test_event_post_does_not_require_csrf(self):
+        client = APIClient(enforce_csrf_checks=True)
+        response = client.post(
+            "/api/events/",
+            data={
+                "name": "CSRF Safe Event",
+                "location": "Test Venue",
+                "start_datetime": timezone.now().isoformat(),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
