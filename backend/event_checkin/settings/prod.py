@@ -3,7 +3,6 @@ from .base import *
 import dj_database_url
 
 DEBUG = False
-SECRET_KEY = config("SECRET_KEY")
 ALLOWED_HOSTS = [host.strip() for host in config("ALLOWED_HOSTS").split(",")]
 
 # Database (PostgreSQL on Render)
