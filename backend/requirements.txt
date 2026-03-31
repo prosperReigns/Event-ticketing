@@ -14,7 +14,6 @@ MarkupSafe==2.1.5
 packaging==26.0
 pillow==10.4.0
 pip-tools==7.5.2
-pkg_resources==0.0.0
 psycopg2-binary==2.9.10
 pycparser==2.23
 pypng==0.20220715.0
