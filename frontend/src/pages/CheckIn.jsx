@@ -53,6 +53,7 @@ const CheckIn = () => {
   const handleScan = useCallback(
     async (rawValue) => {
       if (isChecking) {
+        <QRScanner key={scanKey} onScan={handleScan} isActive={!isChecking} />;
         return;
       }
 
@@ -86,7 +87,7 @@ const CheckIn = () => {
 
   const handleReset = () => {
     setScanKey((prev) => prev + 1);
-    setStatus("");
+    setStatus("");  
     setMessage("");
     setGuest(null);
   };
@@ -109,13 +110,11 @@ const CheckIn = () => {
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <QRScanner key={scanKey} onScan={handleScan} isActive={!isChecking} />
+          <QRScanner key={scanKey} onScan={handleScan} />
         </div>
 
         <div className={`rounded-3xl border p-6 shadow-sm ${cardStyles}`}>
-          <h2 className="text-lg font-semibold text-slate-900">
-            Scan status
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-900">Scan status</h2>
           <p className="mt-2 text-sm text-slate-500">
             Results appear here immediately after each scan.
           </p>

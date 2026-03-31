@@ -1,22 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import BackButton from "../components/BackButton.jsx";
 import StatusAlert from "../components/StatusAlert.jsx";
-import GuestTable from "../components/GuestTable.jsx";
 import { getErrorMessage } from "../api/axios.js";
 import { getEvent } from "../services/eventService.js";
-import { createGuest, getGuests } from "../services/guestService.js";
+import { createGuest } from "../services/guestService.js";
 
 import api from "../api/axios.js";
 
 const GuestList = () => {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
-  const [guests, setGuests] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone: "",
     table_number: "",
   });
   const [bulkInput, setBulkInput] = useState("");
@@ -25,25 +24,18 @@ const GuestList = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const loadGuests = useCallback(async () => {
+  const loadEvent = useCallback(async () => {
     try {
-      const [eventData, guestData] = await Promise.all([
-        getEvent(id),
-        getGuests(id),
-      ]);
-
+      const eventData = await getEvent(id);
       setEvent(eventData);
-      setGuests(Array.isArray(guestData) ? guestData : guestData?.results || []);
     } catch (err) {
-      setError(getErrorMessage(err, "Unable to load guests"));
-    } finally {
-      setIsLoading(false);
+      setError(getErrorMessage(err, "Unable to load event"));
     }
   }, [id]);
 
   useEffect(() => {
-    loadGuests();
-  }, [loadGuests]);
+    loadEvent();
+  }, [loadEvent]);
 
   const bulkGuests = useMemo(() => {
     return bulkInput
@@ -51,12 +43,52 @@ const GuestList = () => {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [name, email, table_number] = line
-          .split(",")
-          .map((value) => value.trim());
-        return { name, email, table_number };
+        const parts = line.split(",").map((value) => value.trim());
+        const name = parts[0] || "";
+        const email = parts[1] || "";
+        let phone = "";
+        let table_number = "";
+        if (parts.length >= 4) {
+          phone = parts[2] || "";
+          table_number = parts[3] || "";
+        } else {
+          table_number = parts[2] || "";
+        }
+        return { name, email, phone, table_number };
       });
   }, [bulkInput]);
+
+  const normalizePhone = (value) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+    if (trimmed.startsWith("+")) {
+      return `+${trimmed.slice(1).replace(/\D/g, "")}`;
+    }
+    if (trimmed.startsWith("00")) {
+      return `+${trimmed.slice(2).replace(/\D/g, "")}`;
+    }
+    const digits = trimmed.replace(/\D/g, "");
+    if (!digits) {
+      return "";
+    }
+    if (digits.startsWith("0")) {
+      return digits;
+    }
+    if (digits.length >= 10 && digits.length <= 15) {
+      return `+${digits}`;
+    }
+    return digits;
+  };
+
+  const isValidPhone = (value) => {
+    if (!value) {
+      return true;
+    }
+    const normalized = normalizePhone(value);
+    return /^\+\d{7,15}$/.test(normalized);
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -72,12 +104,27 @@ const GuestList = () => {
       return;
     }
 
+    if (!formData.email.trim() && !formData.phone.trim()) {
+      setError("Please provide an email or phone number.");
+      return;
+    }
+
+    const normalizedPhone = normalizePhone(formData.phone);
+    if (!isValidPhone(formData.phone)) {
+      setError("Phone must be E.164 format, e.g. +2348012345678.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await createGuest(id, formData);
-      setFormData({ name: "", email: "", table_number: "" });
+      await createGuest(id, {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: normalizedPhone,
+        table_number: formData.table_number.trim(),
+      });
+      setFormData({ name: "", email: "", phone: "", table_number: "" });
       setSuccessMessage("Guest added successfully.");
-      await loadGuests();
     } catch (err) {
       setError(getErrorMessage(err, "Unable to add guest"));
     } finally {
@@ -94,22 +141,34 @@ const GuestList = () => {
     }
 
     const invalidRow = bulkGuests.find(
-      (guest) => !guest.name || !guest.email,
+      (guest) => !guest.name || (!guest.email && !guest.phone),
     );
 
     if (invalidRow) {
-      setError("Each row must include name and email.");
+      setError("Each row must include a name and either email or phone.");
+      return;
+    }
+
+    const invalidPhone = bulkGuests.find(
+      (guest) => guest.phone && !isValidPhone(guest.phone),
+    );
+
+    if (invalidPhone) {
+      setError("Each phone number must be E.164 format, e.g. +2348012345678.");
       return;
     }
 
     setIsBulkSubmitting(true);
     try {
+      const normalizedGuests = bulkGuests.map((guest) => ({
+        ...guest,
+        phone: normalizePhone(guest.phone || ""),
+      }));
       await api.post(`events/${id}/guests/`, {
-        guests: bulkGuests,
+        guests: normalizedGuests,
       });
       setBulkInput("");
       setSuccessMessage("Bulk guests uploaded successfully.");
-      await loadGuests();
     } catch (err) {
       setError(getErrorMessage(err, "Bulk upload failed"));
     } finally {
@@ -119,6 +178,7 @@ const GuestList = () => {
 
   return (
     <section className="space-y-8">
+      <BackButton />
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">Guest List</h1>
         <p className="text-sm text-slate-500">
@@ -128,14 +188,6 @@ const GuestList = () => {
 
       <StatusAlert type="success" message={successMessage} />
       <StatusAlert type="error" message={error} />
-
-      {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          Loading guests...
-        </div>
-      ) : (
-        <GuestTable guests={guests} />
-      )}
 
       <div id="add" className="grid gap-6 lg:grid-cols-2">
         <form
@@ -147,7 +199,7 @@ const GuestList = () => {
               Add a guest
             </h2>
             <p className="text-sm text-slate-500">
-              Send them a QR code from the backend after saving.
+              Send them a QR code by email, or an RSVP link by SMS.
             </p>
           </div>
 
@@ -171,10 +223,30 @@ const GuestList = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              required
               className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
               placeholder="ada@example.com"
             />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Phone number
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              onBlur={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  phone: normalizePhone(event.target.value),
+                }))
+              }
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              placeholder="+2348012345678"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Use E.164 format (country code + number).
+            </p>
           </label>
 
           <label className="block text-sm font-medium text-slate-700">
@@ -204,7 +276,9 @@ const GuestList = () => {
               Bulk upload (CSV)
             </h2>
             <p className="text-sm text-slate-500">
-              Paste rows in this format: name,email,table_number
+              Paste rows in this format: name,email,phone,table_number (use
+              E.164 like +2348012345678; leave email blank like:
+              Ada,,+2348012345678,12)
             </p>
           </div>
 
@@ -213,7 +287,9 @@ const GuestList = () => {
             onChange={(event) => setBulkInput(event.target.value)}
             rows={6}
             className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
-            placeholder="Ada Lovelace,ada@example.com,12"
+            placeholder={
+              "Ada Lovelace,ada@example.com,+2348012345678,12\nAda,,+2348012345678,12"
+            }
           />
 
           <button

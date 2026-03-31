@@ -14,3 +14,13 @@ export const createEvent = async (payload) => {
   const response = await api.post("events/", payload);
   return response.data;
 };
+
+export const updateEvent = async (eventId, payload) => {
+  const response = await api.patch(`events/${eventId}/`, payload);
+  return response.data;
+};
+
+export const deleteEvent = async (eventId) => {
+  const response = await api.delete(`events/${eventId}/`);
+  return response.data;
+};

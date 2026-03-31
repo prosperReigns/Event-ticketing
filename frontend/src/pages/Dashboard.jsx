@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+import BackButton from "../components/BackButton.jsx";
 import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
-import { getEvents } from "../services/eventService.js";
+import { deleteEvent, getEvents } from "../services/eventService.js";
 
 const Dashboard = () => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingEventId, setDeletingEventId] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -25,8 +28,31 @@ const Dashboard = () => {
     fetchEvents();
   }, []);
 
+  const handleDelete = async (eventId, eventName) => {
+    if (deletingEventId) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete ${eventName || "this event"}? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    setDeletingEventId(eventId);
+    setError("");
+    try {
+      await deleteEvent(eventId);
+      setEvents((prev) => prev.filter((event) => event.id !== eventId));
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to delete event"));
+    } finally {
+      setDeletingEventId("");
+    }
+  };
+
   return (
     <section className="space-y-6">
+      <BackButton />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900">Events</h1>
@@ -55,9 +81,17 @@ const Dashboard = () => {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {events.map((event) => (
-            <Link
+            <div
               key={event.id}
-              to={`/events/${event.id}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/events/${event.id}`)}
+              onKeyDown={(eventKey) => {
+                if (eventKey.key === "Enter" || eventKey.key === " ") {
+                  eventKey.preventDefault();
+                  navigate(`/events/${event.id}`);
+                }
+              }}
               className="group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow"
             >
               <div className="flex items-start justify-between">
@@ -76,7 +110,27 @@ const Dashboard = () => {
                   ? new Date(event.start_datetime).toLocaleString()
                   : "Schedule pending"}
               </p>
-            </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link
+                  to={`/events/${event.id}/edit`}
+                  onClick={(eventClick) => eventClick.stopPropagation()}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                >
+                  Update
+                </Link>
+                <button
+                  type="button"
+                  onClick={(eventClick) => {
+                    eventClick.stopPropagation();
+                    handleDelete(event.id, event.name);
+                  }}
+                  disabled={deletingEventId === event.id}
+                  className="rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deletingEventId === event.id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       )}

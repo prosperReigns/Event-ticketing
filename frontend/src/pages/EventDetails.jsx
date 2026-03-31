@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import BackButton from "../components/BackButton.jsx";
 import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
 import { getEvent } from "../services/eventService.js";
@@ -26,8 +27,10 @@ const EventDetails = () => {
     fetchEvent();
   }, [id]);
 
+
   return (
     <section className="space-y-6">
+      <BackButton />
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">Event Details</h1>
         <p className="text-sm text-slate-500">
@@ -47,9 +50,7 @@ const EventDetails = () => {
             <h2 className="text-xl font-semibold text-slate-900">
               {event.name}
             </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              {event.location}
-            </p>
+            <p className="mt-2 text-sm text-slate-600">{event.location}</p>
             <p className="mt-2 text-sm text-slate-500">
               {event.start_datetime
                 ? new Date(event.start_datetime).toLocaleString()
@@ -62,19 +63,19 @@ const EventDetails = () => {
               to={`/events/${id}/guests`}
               className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
             >
-              View Guests
+              Add Guests
             </Link>
             <Link
               to={`/events/${id}/guests/view`}
               className="rounded-full border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
             >
-              Guest Check-in List
+              View Guests
             </Link>
             <Link
-              to={`/events/${id}/guests#add`}
-              className="rounded-full border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              to={`/events/${id}/guests/checkin`}
+              className="rounded-full border border-slate-200 px-6 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
             >
-              Add Guests
+              Guest Check-in List
             </Link>
           </div>
         </div>

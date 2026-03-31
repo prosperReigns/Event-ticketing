@@ -6,6 +6,8 @@ const QRScanner = ({ onScan, onError, isActive = true }) => {
   const elementId = `qr-reader-${scannerId.replace(/:/g, "")}`;
   const hasScannedRef = useRef(false);
   const isRunningRef = useRef(false);
+  const qrInstanceRef = useRef(null);
+  const hasInitializedRef = useRef(false);
   const [cameraError, setCameraError] = useState("");
 
   useEffect(() => {
@@ -13,53 +15,72 @@ const QRScanner = ({ onScan, onError, isActive = true }) => {
       return undefined;
     }
 
+    if (hasInitializedRef.current) {
+      return;
+    }
+    hasInitializedRef.current = true;
+
     let isMounted = true;
     hasScannedRef.current = false;
+    let html5QrCode;
 
-    const html5QrCode = new Html5Qrcode(elementId);
+    (async () => {
+      if (!qrInstanceRef.current) {
+        qrInstanceRef.current = new Html5Qrcode(elementId);
+      }
+      html5QrCode = qrInstanceRef.current;
 
-    html5QrCode
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 260 } },
-        (decodedText) => {
-          if (hasScannedRef.current) {
+      if (isRunningRef.current && qrInstanceRef.current) {
+        await qrInstanceRef.current.stop().catch(() => {});
+        await qrInstanceRef.current.clear().catch(() => {});
+        isRunningRef.current = false;
+      }
+
+      html5QrCode
+        .start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 260, height: 260 } },
+          (decodedText) => {
+            if (hasScannedRef.current) {
+              return;
+            }
+
+            hasScannedRef.current = true;
+            onScan(decodedText);
+
+            if (isRunningRef.current) {
+              html5QrCode
+                .stop()
+                .then(() => {
+                  isRunningRef.current = false;
+                  html5QrCode.clear();
+                })
+                .catch(() => undefined);
+            }
+          },
+          () => undefined,
+        )
+        .then(() => {
+          console.log("QR Scanner started");
+          isRunningRef.current = true;
+        })
+        .catch((error) => {
+          if (!isMounted) {
             return;
           }
-
-          hasScannedRef.current = true;
-          onScan(decodedText);
-
-          if (isRunningRef.current) {
-            html5QrCode
-              .stop()
-              .then(() => {
-                isRunningRef.current = false;
-                html5QrCode.clear();
-              })
-              .catch(() => undefined);
+          const message =
+            typeof error === "string" ? error : "Unable to access camera";
+          setCameraError(message);
+          if (onError) {
+            onError(message);
           }
-        },
-        () => undefined,
-      )
-      .then(() => {
-        console.log("QR Scanner started");
-        isRunningRef.current = true;
-      })
-      .catch((error) => {
-        if (!isMounted) {
-          return;
-        }
-        const message =
-          typeof error === "string" ? error : "Unable to access camera";
-        setCameraError(message);
-        if (onError) {
-          onError(message);
-        }
-      });
+        });
+    })();
 
     return () => {
       isMounted = false;
+      hasInitializedRef.current = false;
+
       if (isRunningRef.current) {
         html5QrCode
           .stop()

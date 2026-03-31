@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import BackButton from "../components/BackButton.jsx";
 import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
 import { getRsvpDetails, submitRsvp } from "../services/rsvpService.js";
@@ -158,6 +159,7 @@ const RsvpPage = () => {
   if (isLoading) {
     return (
       <section className="space-y-6">
+        <BackButton />
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-sm text-slate-500">Loading invitation...</p>
         </div>
@@ -168,6 +170,7 @@ const RsvpPage = () => {
   if (invalidToken) {
     return (
       <section className="space-y-6">
+        <BackButton />
         <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
           Invalid invitation link.
         </div>
@@ -177,6 +180,7 @@ const RsvpPage = () => {
 
   return (
     <section className="space-y-8">
+      <BackButton />
       <div>
         <h1 className="text-3xl font-semibold text-slate-900">
           RSVP Invitation
