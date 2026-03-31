@@ -1,5 +1,5 @@
 """
-Email service using Brevo (primary) with SendGrid fallback.
+Email service using Brevo.
 
 Provides a single public function:
     send_guest_qr_email(guest) -> bool
@@ -10,9 +10,11 @@ import base64
 import os
 import html
 import json
+from urllib.parse import urljoin
 from urllib import request, error
 
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +29,11 @@ def send_guest_qr_email(guest) -> bool:
         logger.warning("Guest %s has no email; skipping invitation.", guest.id)
         return False
 
-    if settings.BREVO_API_KEY:
-        return _send_brevo_email(guest)
+    if not settings.BREVO_API_KEY:
+        logger.warning("Brevo is not configured; skipping email for %s", guest.email)
+        return False
 
-    return _send_sendgrid_email(guest)
+    return _send_brevo_email(guest)
 
 
 def _send_brevo_email(guest) -> bool:
@@ -50,7 +53,7 @@ def _send_brevo_email(guest) -> bool:
         if os.path.exists(qr_path):
             with open(qr_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
-            payload["attachments"] = [{"content": encoded, "name": "qr_code.png"}]
+            payload["attachment"] = [{"content": encoded, "name": "qr_code.png"}]
 
     data = json.dumps(payload).encode("utf-8")
     headers = {
@@ -72,68 +75,6 @@ def _send_brevo_email(guest) -> bool:
         return False
 
 
-def _send_sendgrid_email(guest) -> bool:
-    """Send the invitation email via SendGrid as a fallback provider."""
-    api_key = settings.SENDGRID_API_KEY
-    if not api_key:
-        logger.warning("Email providers not configured – skipping email for %s", guest.email)
-        return False
-
-    try:
-        import sendgrid
-        from sendgrid.helpers.mail import (
-            Mail,
-            Attachment,
-            FileContent,
-            FileName,
-            FileType,
-            Disposition,
-            ContentId,
-        )
-
-        sg = sendgrid.SendGridAPIClient(api_key=api_key)
-        sg.client.timeout = settings.SENDGRID_TIMEOUT_SECONDS
-
-        html_content = _build_html_content(guest)
-
-        message = Mail(
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to_emails=guest.email,
-            subject=f"Your Invitation to {guest.event.name}",
-            html_content=html_content,
-        )
-
-        # Attach QR code image if available
-        if guest.qr_code_image:
-            qr_path = guest.qr_code_image.path
-            if os.path.exists(qr_path):
-                with open(qr_path, "rb") as f:
-                    encoded = base64.b64encode(f.read()).decode()
-
-                attachment = Attachment(
-                    FileContent(encoded),
-                    FileName("qr_code.png"),
-                    FileType("image/png"),
-                    Disposition("inline"),
-                    ContentId("QRCode"),
-                )
-                message.attachment = attachment
-
-        response = sg.send(message)
-        if response.status_code in (200, 202):
-            logger.info("QR email sent to %s (status %s)", guest.email, response.status_code)
-            return True
-
-        logger.error(
-            "SendGrid returned status %s for %s", response.status_code, guest.email
-        )
-        return False
-
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to send email to %s: %s", guest.email, exc)
-        return False
-
-
 def _build_html_content(guest) -> str:
     event = guest.event
     checkin_url = f"{settings.CHECKIN_DOMAIN}/api/checkin/{guest.unique_token}/"
@@ -145,7 +86,15 @@ def _build_html_content(guest) -> str:
 
     qr_html = ""
     if guest.qr_code_image:
-        qr_html = '<img src="cid:QRCode" alt="QR code" style="width:200px; height:200px;" />'
+        qr_url = _build_qr_public_url(guest)
+        if qr_url:
+            safe_qr_url = html.escape(qr_url, quote=True)
+            qr_html = (
+                f'<img src="{safe_qr_url}" alt="QR code" '
+                'style="width:200px; height:200px;" />'
+            )
+
+    event_time = timezone.localtime(event.start_datetime)
 
     return f"""
     <html>
@@ -154,7 +103,7 @@ def _build_html_content(guest) -> str:
         <p>You are invited to <strong>{safe_event_name}</strong>.</p>
         <ul>
           <li><strong>Location:</strong> {safe_event_location}</li>
-          <li><strong>Date &amp; Time:</strong> {event.start_datetime.strftime('%B %d, %Y at %I:%M %p %Z')}</li>
+          <li><strong>Date &amp; Time:</strong> {event_time.strftime('%B %d, %Y at %I:%M %p %Z')}</li>
           <li><strong>Table Number:</strong> {safe_table_number}</li>
         </ul>
         <p>Please present the QR code below (or attached) at the entrance:</p>
@@ -164,3 +113,12 @@ def _build_html_content(guest) -> str:
       </body>
     </html>
     """
+
+
+def _build_qr_public_url(guest) -> str:
+    if not guest.qr_code_image:
+        return ""
+    if not guest.qr_code_image.url:
+        return ""
+    base = settings.CHECKIN_DOMAIN.rstrip("/") + "/"
+    return urljoin(base, guest.qr_code_image.url.lstrip("/"))

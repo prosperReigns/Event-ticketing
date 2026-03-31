@@ -27,6 +27,11 @@ class GuestListCreateView(APIView):
 
     permission_classes = [permissions.AllowAny]
 
+    def get_throttles(self):
+        if self.request.method in {"GET", "HEAD", "OPTIONS"}:
+            return []
+        return super().get_throttles()
+
     def _get_event(self, event_id):
         try:
             return Event.objects.get(pk=event_id)
@@ -69,6 +74,102 @@ class GuestListCreateView(APIView):
         elif not created:
             http_status = status.HTTP_400_BAD_REQUEST
         return Response(response_data, status=http_status)
+
+
+class GuestDetailView(APIView):
+    """
+    DELETE /api/events/{event_id}/guests/{guest_id}/ â€“ remove a guest
+    GET    /api/events/{event_id}/guests/{guest_id}/ â€“ fetch guest
+    PATCH  /api/events/{event_id}/guests/{guest_id}/ â€“ update guest
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get_throttles(self):
+        if self.request.method in {"GET", "HEAD", "OPTIONS"}:
+            return []
+        return super().get_throttles()
+
+    def delete(self, request, event_id, guest_id):
+        try:
+            guest = Guest.objects.select_related("event").get(
+                id=guest_id, event_id=event_id
+            )
+        except Guest.DoesNotExist:
+            return Response({"detail": "Guest not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        guest.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get(self, request, event_id, guest_id):
+        try:
+            guest = Guest.objects.select_related("event").get(
+                id=guest_id, event_id=event_id
+            )
+        except Guest.DoesNotExist:
+            return Response({"detail": "Guest not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = GuestSerializer(guest, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, event_id, guest_id):
+        try:
+            guest = Guest.objects.select_related("event").get(
+                id=guest_id, event_id=event_id
+            )
+        except Guest.DoesNotExist:
+            return Response({"detail": "Guest not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        name = str(request.data.get("name", guest.name)).strip()
+        email = request.data.get("email", guest.email)
+        phone = str(request.data.get("phone", guest.phone) or "").strip()
+        table_number = str(request.data.get("table_number", guest.table_number) or "").strip()
+
+        if not name:
+            return Response(
+                {"detail": "Guest name is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        normalized_email = email.strip().lower() if isinstance(email, str) else email
+        if normalized_email == "":
+            normalized_email = None
+
+        if not normalized_email and not phone:
+            return Response(
+                {"detail": "Each guest must include an email or phone number."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(phone) > 30:
+            return Response(
+                {"detail": "Phone number cannot exceed 30 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if normalized_email:
+            duplicate = (
+                Guest.objects.filter(event_id=event_id, email__iexact=normalized_email)
+                .exclude(id=guest.id)
+                .exists()
+            )
+            if duplicate:
+                return Response(
+                    {"detail": "Guest with this email already exists for the event."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        guest.name = name
+        guest.email = normalized_email
+        guest.phone = phone
+        guest.table_number = table_number
+        guest.is_placeholder = not bool(normalized_email)
+        guest.save(
+            update_fields=["name", "email", "phone", "table_number", "is_placeholder"]
+        )
+
+        serializer = GuestSerializer(guest, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RSVPView(APIView):

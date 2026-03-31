@@ -53,11 +53,8 @@ def process_checkin(token: str, user: Optional[object] = None) -> Dict[str, Any]
                 }
 
             if not event.is_active:
-                return {
-                    "success": False,
-                    "error": "Event is not active yet.",
-                    "status_code": status.HTTP_400_BAD_REQUEST,
-                }
+                event.is_active = True
+                event.save(update_fields=["is_active"])
 
             if guest.rsvp_status != Guest.RSVP_STATUS_ATTENDING:
                 return {

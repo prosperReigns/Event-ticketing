@@ -1,7 +1,7 @@
 """
 Tests for the Event Guest QR Check-in System.
 
-Uses SQLite in-memory DB for speed; no real SendGrid/email calls.
+Uses SQLite in-memory DB for speed; no real email calls.
 """
 
 import uuid

@@ -15,7 +15,7 @@ DATABASES = {
 }
 
 # Suppress real email calls
-SENDGRID_API_KEY = ""
+BREVO_API_KEY = ""
 SEND_EMAIL_ASYNC = False
 
 # Point media to a workspace-local temp directory for cross-platform compatibility.
