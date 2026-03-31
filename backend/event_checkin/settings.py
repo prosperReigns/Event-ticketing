@@ -61,7 +61,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # Keep early so CORS headers land on 4xx responses.
+    "corsheaders.middleware.CorsMiddleware",  # Keep early so CORS headers appear on 4xx responses.
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
