@@ -3,8 +3,14 @@ from pathlib import Path
 from decouple import config
 from django.core.management.utils import get_random_secret_key
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+SECRET_KEY = os.environ.get("SECRET_KEY", 'django-insecure-6ophipqh)6ub6p+$&e713pv*ja79)3_%%6)=+w&n*kul$nf2d*')
 
 # Functions
 def env_bool(name: str, default: bool = False) -> bool:
@@ -33,6 +39,7 @@ if render_host:
     # Render sets this env var; adding it avoids DisallowedHost 400s.
     ALLOWED_HOSTS.append(render_host)
 
+DEBUG = env_bool("DEBUG", default=False)
 # Installed apps
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -81,6 +88,14 @@ TEMPLATES = [
     },
 ]
 
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 WSGI_APPLICATION = "event_checkin.wsgi.application"
 
 # Static & media files
@@ -119,20 +134,41 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "30/min", "user": "120/min"},
 }
 
-# CORS / CSRF defaults (override in dev/prod as needed)
+# CORS / CSRF
 CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", default=False)
-CORS_ALLOWED_ORIGINS = env_list(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:5173,http://127.0.0.1:5173",
-)
-_csrf_trusted_origins = env_list("CSRF_TRUSTED_ORIGINS")
-if not _csrf_trusted_origins:
-    _csrf_trusted_origins = CORS_ALLOWED_ORIGINS
-CSRF_TRUSTED_ORIGINS = _csrf_trusted_origins
-# Only allow credentials when explicitly enabled for cross-site requests.
-CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", default=False)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in config(
+        "CORS_ALLOWED_ORIGINS",
+        default="http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in config(
+        "CSRF_TRUSTED_ORIGINS",
+        default="http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = True
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
 
 # Email / 3rd party integrations can stay here
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+
+# Email (Brevo)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 SEND_EMAIL_ASYNC = env_bool("SEND_EMAIL_ASYNC", default=True)
 BREVO_API_KEY = config("BREVO_API_KEY", default="")

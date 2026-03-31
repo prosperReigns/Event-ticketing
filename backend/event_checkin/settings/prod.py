@@ -1,17 +1,9 @@
 # prod.py
 from .base import *
 import dj_database_url
-from django.core.exceptions import ImproperlyConfigured
 
 DEBUG = False
-SECRET_KEY = config("SECRET_KEY", default="")
-if not SECRET_KEY:
-    raise ImproperlyConfigured("SECRET_KEY must be set in production.")
-ALLOWED_HOSTS = [host.strip() for host in config("ALLOWED_HOSTS").split(",") if host.strip()]
-render_host = config("RENDER_EXTERNAL_HOSTNAME", default="").strip()
-if render_host:
-    # Render provides the external hostname so we can avoid DisallowedHost 400s.
-    ALLOWED_HOSTS.append(render_host)
+ALLOWED_HOSTS = [host.strip() for host in config("ALLOWED_HOSTS").split(",")]
 
 # Database (PostgreSQL on Render)
 DATABASES = {
