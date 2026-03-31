@@ -34,8 +34,13 @@ class BulkSMSProvider(SMSProvider):
         return _send_bulksms_request(payload, self.url)
 
     def send_bulk_sms(self, phone_numbers: Iterable[str], message: str) -> bool:
+        numbers = list(phone_numbers)
+        if not numbers:
+            logger.warning("No recipients provided for BulkSMS bulk send.")
+            return False
+
         results = []
-        for phone_number in phone_numbers:
+        for phone_number in numbers:
             payload = {"from": self.sender_id, "to": phone_number, "body": message}
             success = _send_bulksms_request(payload, self.url)
             results.append(success)
