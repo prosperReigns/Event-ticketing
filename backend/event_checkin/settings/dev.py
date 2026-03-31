@@ -1,7 +1,10 @@
 from .base import *
 
 DEBUG = True
-SECRET_KEY = config("SECRET_KEY", default=get_random_secret_key())
+SECRET_KEY = config("SECRET_KEY", default="")
+if not SECRET_KEY:
+    # Use a generated key for local development only.
+    SECRET_KEY = get_random_secret_key()
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 CORS_ALLOW_ALL_ORIGINS = True

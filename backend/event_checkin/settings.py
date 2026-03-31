@@ -5,6 +5,7 @@ Django settings for event_checkin project.
 from pathlib import Path
 
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.utils import get_random_secret_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +35,8 @@ SECRET_KEY = config("SECRET_KEY", default="")
 if not SECRET_KEY and DEBUG:
     # Only fall back to a generated key for local development.
     SECRET_KEY = get_random_secret_key()
+if not SECRET_KEY and not DEBUG:
+    raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is False.")
 ALLOWED_HOSTS = [
     host.strip()
     for host in config("ALLOWED_HOSTS", default="127.0.0.1,localhost").split(",")
