@@ -204,3 +204,4 @@ TERMII_TIMEOUT_SECONDS = config("TERMII_TIMEOUT_SECONDS", default=10, cast=int)
 # BulkSMS Nigeria
 BULKSMS_API_TOKEN = config("BULKSMS_API_TOKEN", default="")
 BULKSMS_SENDER_ID = config("BULKSMS_SENDER_ID", default="")
+SMS_PROVIDER = config("SMS_PROVIDER", default="bulksms")
