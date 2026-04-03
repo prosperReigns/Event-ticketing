@@ -9,6 +9,7 @@ import io
 import os
 import re
 from typing import Optional
+from urllib.parse import urlencode
 import qrcode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from django.conf import settings
@@ -29,7 +30,7 @@ def generate_qr_code(guest) -> str:
 
     Returns the relative file path (relative to MEDIA_ROOT).
     """
-    checkin_url = f"{settings.CHECKIN_DOMAIN}/api/checkin/{guest.unique_token}/"
+    checkin_url = _build_checkin_url(guest)
 
     qr = qrcode.QRCode(
         version=1,
@@ -53,6 +54,13 @@ def generate_qr_code(guest) -> str:
     guest.qr_code_image.save(filename, ContentFile(buffer.read()), save=True)
 
     return filename
+
+
+def _build_checkin_url(guest) -> str:
+    """Build the frontend check-in URL for a guest token as a query parameter."""
+    base = settings.CHECKIN_DOMAIN.rstrip("/")
+    query = urlencode({"token": str(guest.unique_token)})
+    return f"{base}/checkin/?{query}"
 
 
 def _get_event_color(event) -> str:
