@@ -325,14 +325,13 @@ class CheckinLinkGenerationTest(TestCase):
 
         self.assertEqual(url, f"https://frontend.example.com/rsvp/{guest.unique_token}/")
 
-    def test_email_checkin_link_uses_frontend_checkin_route(self):
+    def test_email_contains_qr_image_from_media_base_url(self):
         event = make_event()
         guest = make_guest(event)
 
-        html_content = _build_html_content(guest)
-
-        expected = f"https://frontend.example.com/checkin/?token={guest.unique_token}"
-        self.assertIn(expected, html_content)
+        with override_settings(MEDIA_BASE_URL="https://api.example.com"):
+            html_content = _build_html_content(guest)
+        self.assertIn("https://api.example.com/media/", html_content)
 
 
 @override_settings(CHECKIN_DOMAIN="https://frontend.example.com", MEDIA_ROOT=str(TEST_MEDIA_ROOT))
@@ -347,8 +346,8 @@ class EmailQrEmbeddingTest(TestCase):
         html_content = _build_html_content(guest)
         self.assertIn("Your QR code is shown above and also attached", html_content)
         self.assertIn("Guest QR code", html_content)
-        self.assertIn("/checkin/?token=", html_content)
-        self.assertIn("/rsvp/", html_content)
+        self.assertNotIn("RSVP", html_content)
+        self.assertNotIn("Check-in Link", html_content)
 
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
 
