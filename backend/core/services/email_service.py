@@ -9,14 +9,12 @@ import logging
 import base64
 import os
 import json
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import urljoin, urlparse
 from urllib import request, error
 
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
-
-from .rsvp_service import build_rsvp_url
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +79,6 @@ def _build_html_content(guest) -> str:
     event = guest.event
     event_time = timezone.localtime(event.start_datetime)
     event_time_display = event_time.strftime("%B %d, %Y at %I:%M %p %Z")
-    checkin_url = _build_checkin_url(guest)
-    rsvp_url = build_rsvp_url(guest)
 
     logo_src = _resolve_image_url(event.logo)
     qr_src = _resolve_image_url(guest.qr_code_image)
@@ -97,16 +93,8 @@ def _build_html_content(guest) -> str:
             "event_time_display": event_time_display,
             "logo_src": logo_src,
             "qr_src": qr_src,
-            "checkin_url": checkin_url,
-            "rsvp_url": rsvp_url,
         },
     )
-
-
-def _build_checkin_url(guest) -> str:
-    base = settings.CHECKIN_DOMAIN.rstrip("/")
-    query = urlencode({"token": str(guest.unique_token)})
-    return f"{base}/checkin/?{query}"
 
 
 def _get_image_field_path(image_field) -> str:
@@ -128,7 +116,8 @@ def _resolve_image_url(image_field) -> str:
     if urlparse(image_url).scheme in {"http", "https"}:
         return image_url
 
-    base = settings.CHECKIN_DOMAIN.rstrip("/")
+    media_base = settings.MEDIA_BASE_URL.rstrip("/")
+    base = media_base or settings.CHECKIN_DOMAIN.rstrip("/")
     if not base:
         return image_url
     if image_url.startswith("/"):
