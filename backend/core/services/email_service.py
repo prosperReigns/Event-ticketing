@@ -10,7 +10,6 @@ import base64
 import os
 import html
 import json
-from urllib.parse import urljoin
 from urllib import request, error
 
 from django.conf import settings
@@ -77,7 +76,7 @@ def _send_brevo_email(guest) -> bool:
 
 def _build_html_content(guest) -> str:
     event = guest.event
-    checkin_url = f"{settings.CHECKIN_DOMAIN}/api/checkin/{guest.unique_token}/"
+    checkin_url = f"{settings.CHECKIN_DOMAIN.rstrip('/')}/checkin/?token={guest.unique_token}"
     safe_guest_name = html.escape(guest.name)
     safe_event_name = html.escape(event.name)
     safe_event_location = html.escape(event.location)
@@ -85,14 +84,13 @@ def _build_html_content(guest) -> str:
     safe_checkin_url = html.escape(checkin_url, quote=True)
 
     qr_html = ""
-    if guest.qr_code_image:
-        qr_url = _build_qr_public_url(guest)
-        if qr_url:
-            safe_qr_url = html.escape(qr_url, quote=True)
-            qr_html = (
-                f'<img src="{safe_qr_url}" alt="QR code" '
-                'style="width:200px; height:200px;" />'
-            )
+    qr_data_uri = _build_qr_data_uri(guest)
+    if qr_data_uri:
+        safe_qr_data_uri = html.escape(qr_data_uri, quote=True)
+        qr_html = (
+            f'<img src="{safe_qr_data_uri}" alt="QR code" '
+            'style="width:200px; height:200px;" />'
+        )
 
     event_time = timezone.localtime(event.start_datetime)
 
@@ -115,10 +113,12 @@ def _build_html_content(guest) -> str:
     """
 
 
-def _build_qr_public_url(guest) -> str:
+def _build_qr_data_uri(guest) -> str:
     if not guest.qr_code_image:
         return ""
-    if not guest.qr_code_image.url:
+    qr_path = getattr(guest.qr_code_image, "path", "")
+    if not qr_path or not os.path.exists(qr_path):
         return ""
-    base = settings.CHECKIN_DOMAIN.rstrip("/") + "/"
-    return urljoin(base, guest.qr_code_image.url.lstrip("/"))
+    with open(qr_path, "rb") as file_obj:
+        encoded = base64.b64encode(file_obj.read()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
