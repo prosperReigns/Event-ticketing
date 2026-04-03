@@ -39,10 +39,7 @@ def send_guest_qr_email(guest) -> bool:
 
 
 def _send_brevo_email(guest) -> bool:
-    logo_src = _resolve_image_url(guest.event.logo)
-    qr_src = _resolve_image_url(guest.qr_code_image)
-
-    html_content = _build_html_content(guest, logo_src=logo_src, qr_src=qr_src)
+    html_content = _build_html_content(guest)
     payload = {
         "sender": {
             "email": settings.BREVO_SENDER_EMAIL,
@@ -80,15 +77,15 @@ def _send_brevo_email(guest) -> bool:
         return False
 
 
-def _build_html_content(guest, logo_src: str = "", qr_src: str = "") -> str:
+def _build_html_content(guest) -> str:
     event = guest.event
     event_time = timezone.localtime(event.start_datetime)
     event_time_display = event_time.strftime("%B %d, %Y at %I:%M %p %Z")
     checkin_url = _build_checkin_url(guest)
     rsvp_url = build_rsvp_url(guest)
 
-    resolved_logo_src = logo_src or _resolve_image_url(event.logo)
-    resolved_qr_src = qr_src or _resolve_image_url(guest.qr_code_image)
+    logo_src = _resolve_image_url(event.logo)
+    qr_src = _resolve_image_url(guest.qr_code_image)
 
     return render_to_string(
         "emails/guest_invitation.html",
@@ -98,8 +95,8 @@ def _build_html_content(guest, logo_src: str = "", qr_src: str = "") -> str:
             "event_location": event.location,
             "table_number": guest.table_number,
             "event_time_display": event_time_display,
-            "logo_src": resolved_logo_src,
-            "qr_src": resolved_qr_src,
+            "logo_src": logo_src,
+            "qr_src": qr_src,
             "checkin_url": checkin_url,
             "rsvp_url": rsvp_url,
         },
@@ -115,7 +112,7 @@ def _build_checkin_url(guest) -> str:
 def _resolve_field_path(image_field) -> str:
     try:
         return image_field.path
-    except (AttributeError, ValueError, OSError):
+    except (AttributeError, ValueError):
         return ""
 
 
