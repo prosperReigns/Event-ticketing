@@ -332,12 +332,12 @@ class CheckinLinkGenerationTest(TestCase):
         html_content = _build_html_content(guest)
 
         expected = f"https://frontend.example.com/checkin/?token={guest.unique_token}"
-        self.assertNotIn(expected, html_content)
+        self.assertIn(expected, html_content)
 
 
 @override_settings(CHECKIN_DOMAIN="https://frontend.example.com", MEDIA_ROOT=str(TEST_MEDIA_ROOT))
 class EmailQrEmbeddingTest(TestCase):
-    def test_email_html_contains_attachment_only_message(self):
+    def test_email_html_contains_embedded_qr_and_attachment_message(self):
         os.makedirs(TEST_MEDIA_ROOT / "qr_codes", exist_ok=True)
         event = make_event()
         guest = make_guest(event)
@@ -345,9 +345,10 @@ class EmailQrEmbeddingTest(TestCase):
         guest.refresh_from_db()
 
         html_content = _build_html_content(guest)
-        self.assertIn("QR code is attached", html_content)
-        self.assertNotIn("data:image/png;base64,", html_content)
-        self.assertNotIn("/checkin/?token=", html_content)
+        self.assertIn("Your QR code is shown above and also attached", html_content)
+        self.assertIn("Guest QR code", html_content)
+        self.assertIn("/checkin/?token=", html_content)
+        self.assertIn("/rsvp/", html_content)
 
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
 

@@ -8,12 +8,15 @@ Provides a single public function:
 import logging
 import base64
 import os
-import html
 import json
+from urllib.parse import urlencode, urljoin, urlparse
 from urllib import request, error
 
 from django.conf import settings
+from django.template.loader import render_to_string
 from django.utils import timezone
+
+from .rsvp_service import build_rsvp_url
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ def _send_brevo_email(guest) -> bool:
     }
 
     if guest.qr_code_image:
-        qr_path = guest.qr_code_image.path
+        qr_path = _get_image_field_path(guest.qr_code_image)
         if os.path.exists(qr_path):
             with open(qr_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
@@ -76,26 +79,58 @@ def _send_brevo_email(guest) -> bool:
 
 def _build_html_content(guest) -> str:
     event = guest.event
-    safe_guest_name = html.escape(guest.name)
-    safe_event_name = html.escape(event.name)
-    safe_event_location = html.escape(event.location)
-    safe_table_number = html.escape(guest.table_number)
-
     event_time = timezone.localtime(event.start_datetime)
+    event_time_display = event_time.strftime("%B %d, %Y at %I:%M %p %Z")
+    checkin_url = _build_checkin_url(guest)
+    rsvp_url = build_rsvp_url(guest)
 
-    return f"""
-    <html>
-      <body>
-        <h2>Hello {safe_guest_name},</h2>
-        <p>You are invited to <strong>{safe_event_name}</strong>.</p>
-        <ul>
-          <li><strong>Location:</strong> {safe_event_location}</li>
-          <li><strong>Date &amp; Time:</strong> {event_time.strftime('%B %d, %Y at %I:%M %p %Z')}</li>
-          <li><strong>Table Number:</strong> {safe_table_number}</li>
-        </ul>
-        <p>Your QR code is attached to this email as a downloadable file.</p>
-        <p>Please present the attached QR code at the entrance.</p>
-        <p>We look forward to seeing you!</p>
-      </body>
-    </html>
-    """
+    logo_src = _resolve_image_url(event.logo)
+    qr_src = _resolve_image_url(guest.qr_code_image)
+
+    return render_to_string(
+        "emails/guest_invitation.html",
+        {
+            "guest_name": guest.name,
+            "event_name": event.name,
+            "event_location": event.location,
+            "table_number": guest.table_number,
+            "event_time_display": event_time_display,
+            "logo_src": logo_src,
+            "qr_src": qr_src,
+            "checkin_url": checkin_url,
+            "rsvp_url": rsvp_url,
+        },
+    )
+
+
+def _build_checkin_url(guest) -> str:
+    base = settings.CHECKIN_DOMAIN.rstrip("/")
+    query = urlencode({"token": str(guest.unique_token)})
+    return f"{base}/checkin/?{query}"
+
+
+def _get_image_field_path(image_field) -> str:
+    try:
+        return image_field.path
+    except (AttributeError, ValueError):
+        return ""
+
+
+def _resolve_image_url(image_field) -> str:
+    if not image_field:
+        return ""
+    try:
+        image_url = image_field.url
+    except (AttributeError, ValueError):
+        return ""
+    if not image_url:
+        return ""
+    if urlparse(image_url).scheme in {"http", "https"}:
+        return image_url
+
+    base = settings.CHECKIN_DOMAIN.rstrip("/")
+    if not base:
+        return image_url
+    if image_url.startswith("/"):
+        return f"{base}{image_url}"
+    return urljoin(f"{base}/", image_url)
