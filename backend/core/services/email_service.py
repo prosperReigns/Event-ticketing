@@ -116,7 +116,7 @@ def _resolve_image_url(image_field) -> str:
     if urlparse(image_url).scheme in {"http", "https"}:
         return image_url
 
-    media_base = getattr(settings, "MEDIA_BASE_URL", "").rstrip("/")
+    media_base = settings.MEDIA_BASE_URL.rstrip("/")
     base = media_base or settings.CHECKIN_DOMAIN.rstrip("/")
     if not base:
         return image_url

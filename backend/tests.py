@@ -328,6 +328,8 @@ class CheckinLinkGenerationTest(TestCase):
     def test_email_contains_qr_image_from_media_base_url(self):
         event = make_event()
         guest = make_guest(event)
+        generate_qr_code(guest)
+        guest.refresh_from_db()
 
         with override_settings(MEDIA_BASE_URL="https://api.example.com"):
             html_content = _build_html_content(guest)
