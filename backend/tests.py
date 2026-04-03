@@ -307,11 +307,14 @@ class EventApiCsrfTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
-@override_settings(CHECKIN_DOMAIN="https://frontend.example.com")
+@override_settings(
+    CHECKIN_DOMAIN="https://frontend.example.com",
+    RSVP_DOMAIN="https://frontend.example.com",
+)
 class CheckinLinkGenerationTest(TestCase):
     def test_rsvp_url_uses_frontend_domain_and_route(self):
         event = make_event()
-        guest = make_guest(event, is_placeholder=True, email=None, phone="+123456")
+        guest = make_guest(event, is_placeholder=True, email=None)
 
         url = build_rsvp_url(guest)
 
