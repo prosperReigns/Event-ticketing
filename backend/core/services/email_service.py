@@ -76,21 +76,10 @@ def _send_brevo_email(guest) -> bool:
 
 def _build_html_content(guest) -> str:
     event = guest.event
-    checkin_url = f"{settings.CHECKIN_DOMAIN.rstrip('/')}/checkin/?token={guest.unique_token}"
     safe_guest_name = html.escape(guest.name)
     safe_event_name = html.escape(event.name)
     safe_event_location = html.escape(event.location)
     safe_table_number = html.escape(guest.table_number)
-    safe_checkin_url = html.escape(checkin_url, quote=True)
-
-    qr_html = ""
-    qr_data_uri = _build_qr_data_uri(guest)
-    if qr_data_uri:
-        safe_qr_data_uri = html.escape(qr_data_uri, quote=True)
-        qr_html = (
-            f'<img src="{safe_qr_data_uri}" alt="QR code" '
-            'style="width:200px; height:200px;" />'
-        )
 
     event_time = timezone.localtime(event.start_datetime)
 
@@ -104,27 +93,9 @@ def _build_html_content(guest) -> str:
           <li><strong>Date &amp; Time:</strong> {event_time.strftime('%B %d, %Y at %I:%M %p %Z')}</li>
           <li><strong>Table Number:</strong> {safe_table_number}</li>
         </ul>
-        <p>Please present the QR code below (or attached) at the entrance:</p>
-        <div>{qr_html}</div>
-        <p>Or use this link: <a href="{safe_checkin_url}">{safe_checkin_url}</a></p>
+        <p>Your QR code is attached to this email as a downloadable file.</p>
+        <p>Please present the attached QR code at the entrance.</p>
         <p>We look forward to seeing you!</p>
       </body>
     </html>
     """
-
-
-def _build_qr_data_uri(guest) -> str:
-    """Return the guest QR image as a data URI suitable for inline email HTML."""
-    if not guest.qr_code_image:
-        return ""
-    qr_path = getattr(guest.qr_code_image, "path", "")
-    if not qr_path or not os.path.exists(qr_path):
-        logger.warning("QR image file missing for guest %s at path '%s'", guest.id, qr_path)
-        return ""
-    try:
-        with open(qr_path, "rb") as file_obj:
-            encoded = base64.b64encode(file_obj.read()).decode("ascii")
-    except (OSError, ValueError) as exc:
-        logger.warning("Failed to read QR image file for guest %s: %s", guest.id, exc)
-        return ""
-    return f"data:image/png;base64,{encoded}"

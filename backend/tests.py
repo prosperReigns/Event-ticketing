@@ -11,10 +11,12 @@ import tempfile
 import shutil
 from datetime import timedelta
 from unittest.mock import patch
+from io import BytesIO
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -26,7 +28,8 @@ from core.services.checkin_service import process_checkin
 from core.services.guest_service import bulk_create_guests
 from core.services.rsvp_service import build_rsvp_url
 from core.services.email_service import _build_html_content
-from core.services.qr_service import generate_qr_code
+from core.services.qr_service import generate_qr_code, _load_event_logo
+from PIL import Image
 
 User = get_user_model()
 
@@ -329,12 +332,12 @@ class CheckinLinkGenerationTest(TestCase):
         html_content = _build_html_content(guest)
 
         expected = f"https://frontend.example.com/checkin/?token={guest.unique_token}"
-        self.assertIn(expected, html_content)
+        self.assertNotIn(expected, html_content)
 
 
 @override_settings(CHECKIN_DOMAIN="https://frontend.example.com", MEDIA_ROOT=str(TEST_MEDIA_ROOT))
 class EmailQrEmbeddingTest(TestCase):
-    def test_email_html_embeds_qr_code_data_uri(self):
+    def test_email_html_contains_attachment_only_message(self):
         os.makedirs(TEST_MEDIA_ROOT / "qr_codes", exist_ok=True)
         event = make_event()
         guest = make_guest(event)
@@ -342,6 +345,27 @@ class EmailQrEmbeddingTest(TestCase):
         guest.refresh_from_db()
 
         html_content = _build_html_content(guest)
-        self.assertIn('src="data:image/png;base64,', html_content)
+        self.assertIn("QR code is attached", html_content)
+        self.assertNotIn("data:image/png;base64,", html_content)
+        self.assertNotIn("/checkin/?token=", html_content)
+
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+
+@override_settings(MEDIA_ROOT=str(TEST_MEDIA_ROOT))
+class EventLogoLoadingTest(TestCase):
+    def test_load_event_logo_reads_from_storage_file_open(self):
+        os.makedirs(TEST_MEDIA_ROOT / "event_logos", exist_ok=True)
+        event = make_event()
+
+        img = Image.new("RGBA", (20, 20), (255, 0, 0, 255))
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        event.logo.save("logo.png", ContentFile(buf.read()), save=True)
+
+        loaded = _load_event_logo(event, 20)
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded.size, (20, 20))
 
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)

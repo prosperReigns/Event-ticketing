@@ -6,7 +6,6 @@ MEDIA_ROOT/qr_codes/<token>.png.
 """
 
 import io
-import os
 import re
 from typing import Optional
 from urllib.parse import urlencode
@@ -116,16 +115,17 @@ def _load_event_logo(event, logo_size: int) -> Optional[Image.Image]:
     if not logo_field:
         return None
     try:
-        logo_path = logo_field.path
-    except (ValueError, AttributeError):
-        return None
-    if not logo_path or not os.path.exists(logo_path):
-        return None
-    try:
-        with Image.open(logo_path) as logo:
-            return logo.copy()
-    except (OSError, ValueError):
-        return None
+        with logo_field.open("rb") as logo_file:
+            with Image.open(logo_file) as logo:
+                return logo.copy()
+    except (OSError, ValueError, AttributeError):
+        # Fallback for storages/files that only expose a local path.
+        try:
+            logo_path = logo_field.path
+            with Image.open(logo_path) as logo:
+                return logo.copy()
+        except (OSError, ValueError, AttributeError):
+            return None
 
 
 def _build_initials_logo(event, logo_size: int, fill_color: str) -> Optional[Image.Image]:
