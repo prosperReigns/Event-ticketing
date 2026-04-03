@@ -51,7 +51,7 @@ def _send_brevo_email(guest) -> bool:
     }
 
     if guest.qr_code_image:
-        qr_path = _resolve_field_path(guest.qr_code_image)
+        qr_path = _get_image_field_path(guest.qr_code_image)
         if os.path.exists(qr_path):
             with open(qr_path, "rb") as f:
                 encoded = base64.b64encode(f.read()).decode()
@@ -109,7 +109,7 @@ def _build_checkin_url(guest) -> str:
     return f"{base}/checkin/?{query}"
 
 
-def _resolve_field_path(image_field) -> str:
+def _get_image_field_path(image_field) -> str:
     try:
         return image_field.path
     except (AttributeError, ValueError):
