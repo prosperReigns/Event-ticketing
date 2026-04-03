@@ -114,11 +114,17 @@ def _build_html_content(guest) -> str:
 
 
 def _build_qr_data_uri(guest) -> str:
+    """Return the guest QR image as a data URI suitable for inline email HTML."""
     if not guest.qr_code_image:
         return ""
     qr_path = getattr(guest.qr_code_image, "path", "")
     if not qr_path or not os.path.exists(qr_path):
+        logger.warning("QR image file missing for guest %s at path '%s'", guest.id, qr_path)
         return ""
-    with open(qr_path, "rb") as file_obj:
-        encoded = base64.b64encode(file_obj.read()).decode("ascii")
+    try:
+        with open(qr_path, "rb") as file_obj:
+            encoded = base64.b64encode(file_obj.read()).decode("ascii")
+    except (OSError, ValueError) as exc:
+        logger.warning("Failed to read QR image file for guest %s: %s", guest.id, exc)
+        return ""
     return f"data:image/png;base64,{encoded}"

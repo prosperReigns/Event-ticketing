@@ -57,6 +57,7 @@ def generate_qr_code(guest) -> str:
 
 
 def _build_checkin_url(guest) -> str:
+    """Build the frontend check-in URL for a guest token as a query parameter."""
     base = settings.CHECKIN_DOMAIN.rstrip("/")
     query = urlencode({"token": str(guest.unique_token)})
     return f"{base}/checkin/?{query}"

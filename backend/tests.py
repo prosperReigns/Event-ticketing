@@ -8,6 +8,7 @@ import os
 import uuid
 from pathlib import Path
 import tempfile
+import shutil
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -25,6 +26,7 @@ from core.services.checkin_service import process_checkin
 from core.services.guest_service import bulk_create_guests
 from core.services.rsvp_service import build_rsvp_url
 from core.services.email_service import _build_html_content
+from core.services.qr_service import generate_qr_code
 
 User = get_user_model()
 
@@ -333,10 +335,6 @@ class CheckinLinkGenerationTest(TestCase):
 @override_settings(CHECKIN_DOMAIN="https://frontend.example.com", MEDIA_ROOT=str(TEST_MEDIA_ROOT))
 class EmailQrEmbeddingTest(TestCase):
     def test_email_html_embeds_qr_code_data_uri(self):
-        import os
-        import shutil
-        from core.services.qr_service import generate_qr_code
-
         os.makedirs(TEST_MEDIA_ROOT / "qr_codes", exist_ok=True)
         event = make_event()
         guest = make_guest(event)
