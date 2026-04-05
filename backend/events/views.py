@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 _DEFAULT_REGISTRATION_FIELDS = [
     {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
     {"name": "email", "type": "email", "required": True, "label": "Email"},
+    {"name": "phone", "type": "tel", "required": False, "label": "Phone Number"},
 ]
 
 
 def _get_effective_fields(event):
     """Return the event's effective registration fields.
 
-    Base fields (full_name, email) are always included.  When the event has
+    Base fields (full_name, email, phone) are always included.  When the event has
     custom registration_fields they are used, with any missing base fields
     prepended so that name and email are always collected.
     """
@@ -200,11 +201,12 @@ class PublicEventRegisterView(APIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Extract canonical name/email from the validated payload.
+        # Extract canonical name/email/phone from the validated payload.
         # Support both 'full_name' (default key) and 'name' so that events
         # with a custom field named 'name' also work correctly.
         name = (validated.get("full_name") or validated.get("name", "")).strip()
         email = validated.get("email", "").strip().lower()
+        phone = validated.get("phone", "").strip()
 
         # Safety net: if the event's custom registration_fields omit any name
         # field entirely, validated won't contain 'full_name'/'name' and we'd
@@ -223,6 +225,7 @@ class PublicEventRegisterView(APIView):
             event=event,
             name=name,
             email=email,
+            phone=phone,
             rsvp_status=Guest.RSVP_STATUS_ATTENDING,
             is_placeholder=False,
         )

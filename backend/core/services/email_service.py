@@ -87,6 +87,7 @@ def _build_html_content(guest) -> str:
         "emails/guest_invitation.html",
         {
             "guest_name": guest.name,
+            "guest_phone": guest.phone or "",
             "event_name": event.name,
             "event_location": event.location,
             "table_number": guest.table_number,
