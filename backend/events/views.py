@@ -160,6 +160,10 @@ class PublicEventRegisterView(APIView):
         name = (validated.get("full_name") or validated.get("name", "")).strip()
         email = validated.get("email", "").strip().lower()
 
+        # Safety net: if the event's custom registration_fields omit any name
+        # field entirely, validated won't contain 'full_name'/'name' and we'd
+        # create a Guest with an empty name string.  Catch that misconfiguration
+        # early with a clear error rather than a silent DB-level issue.
         if not name:
             return Response({"full_name": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
