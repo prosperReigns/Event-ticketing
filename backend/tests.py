@@ -537,6 +537,57 @@ class PublicEventBySlugTest(TestCase):
         response = self.client.get("/api/events/slug/no-such-event/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_detail_returns_default_fields_when_registration_fields_empty(self, mock_qr, mock_email):
+        """GET slug endpoint should return full_name + email defaults when no custom fields."""
+        response = self.client.get(f"/api/events/slug/{self.public_event.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        field_names = [f["name"] for f in response.data["registration_fields"]]
+        self.assertIn("full_name", field_names)
+        self.assertIn("email", field_names)
+
+    def test_detail_prepends_base_fields_when_custom_fields_omit_them(self, mock_qr, mock_email):
+        """GET slug endpoint should always include full_name + email even when custom fields omit them."""
+        event = Event.objects.create(
+            name="Custom Fields Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "phone", "type": "text", "required": True, "label": "Phone"},
+            ],
+        )
+        response = self.client.get(f"/api/events/slug/{event.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        field_names = [f["name"] for f in response.data["registration_fields"]]
+        self.assertIn("full_name", field_names)
+        self.assertIn("email", field_names)
+        self.assertIn("phone", field_names)
+        # Base fields should come before custom fields
+        self.assertLess(field_names.index("full_name"), field_names.index("phone"))
+        self.assertLess(field_names.index("email"), field_names.index("phone"))
+
+    def test_detail_does_not_duplicate_base_fields_when_already_present(self, mock_qr, mock_email):
+        """GET slug endpoint should not duplicate full_name/email if already in custom fields."""
+        fields = [
+            {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+            {"name": "email", "type": "email", "required": True, "label": "Email"},
+            {"name": "company", "type": "text", "required": False, "label": "Company"},
+        ]
+        event = Event.objects.create(
+            name="Full Custom Fields Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=fields,
+        )
+        response = self.client.get(f"/api/events/slug/{event.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_fields = response.data["registration_fields"]
+        field_names = [f["name"] for f in returned_fields]
+        self.assertEqual(field_names.count("full_name"), 1)
+        self.assertEqual(field_names.count("email"), 1)
+        self.assertIn("company", field_names)
+
     def test_successful_registration_by_slug(self, mock_qr, mock_email):
         response = self.client.post(
             f"/api/events/slug/{self.public_event.slug}/guests/",

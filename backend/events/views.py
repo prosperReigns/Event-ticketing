@@ -23,8 +23,18 @@ _DEFAULT_REGISTRATION_FIELDS = [
 
 
 def _get_effective_fields(event):
-    """Return the event's registration fields, or the default fields if none are set."""
-    return event.registration_fields if event.registration_fields else _DEFAULT_REGISTRATION_FIELDS
+    """Return the event's effective registration fields.
+
+    Base fields (full_name, email) are always included.  When the event has
+    custom registration_fields they are used, with any missing base fields
+    prepended so that name and email are always collected.
+    """
+    if not event.registration_fields:
+        return _DEFAULT_REGISTRATION_FIELDS
+
+    custom_names = {f["name"] for f in event.registration_fields}
+    prepend = [f for f in _DEFAULT_REGISTRATION_FIELDS if f["name"] not in custom_names]
+    return prepend + event.registration_fields
 
 
 def _validate_registration_data(data, fields):
@@ -149,7 +159,8 @@ class PublicEventDetailView(APIView):
             )
 
         serializer = EventSerializer(event)
-        return Response(serializer.data)
+        data = {**serializer.data, "registration_fields": _get_effective_fields(event)}
+        return Response(data)
 
 
 class PublicEventRegisterView(APIView):
