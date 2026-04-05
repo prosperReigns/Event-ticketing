@@ -8,7 +8,7 @@ import { getPublicEvent, registerForEventBySlug } from "../services/eventService
 const RegisterPage = () => {
   const { slug } = useParams();
   const [event, setEvent] = useState(null);
-  const [formData, setFormData] = useState({ name: "", email: "" });
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -75,16 +75,22 @@ const RegisterPage = () => {
       return;
     }
 
+    if (!formData.phone.trim()) {
+      setError("Phone number is required.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await registerForEventBySlug(slug, {
         name: formData.name.trim(),
         email: formData.email.trim(),
+        phone: formData.phone.trim(),
       });
       setSuccessMessage(
         "Registration successful! Your QR code has been sent to your email."
       );
-      setFormData({ name: "", email: "" });
+      setFormData({ name: "", email: "", phone: "" });
     } catch (err) {
       setError(getErrorMessage(err, "Registration failed. Please try again."));
     } finally {
@@ -181,7 +187,7 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              placeholder="Your full name"
+              placeholder="Enter your full name"
             />
           </label>
 
@@ -194,7 +200,20 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
-              placeholder="you@example.com"
+              placeholder="Enter your email address"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Phone number
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              placeholder="Enter your phone number"
             />
           </label>
 
