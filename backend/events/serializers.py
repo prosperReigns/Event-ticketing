@@ -18,6 +18,7 @@ class EventSerializer(serializers.ModelSerializer):
             "logo",
             "is_active",
             "registration_type",
+            "registration_fields",
             "created_at",
             "updated_at",
         ]

@@ -29,6 +29,11 @@ class Event(models.Model):
         choices=REGISTRATION_TYPE_CHOICES,
         default=REGISTRATION_PRIVATE,
     )
+    # Dynamic registration form fields. Each entry is a dict with keys:
+    #   name (str), type (str: text|email|select|textarea), required (bool),
+    #   label (str, optional), options (list[str], only for select type).
+    # Empty list → default to full_name + email fields.
+    registration_fields = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

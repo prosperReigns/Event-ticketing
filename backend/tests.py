@@ -22,7 +22,7 @@ from rest_framework.test import APIClient
 
 from event_checkin.settings.base import env_list
 from events.models import Event
-from guests.models import Guest
+from guests.models import Guest, GuestResponse
 from checkins.models import CheckInLog
 from core.services.checkin_service import process_checkin
 from core.services.guest_service import bulk_create_guests
@@ -382,7 +382,7 @@ class PublicEventRegistrationTest(TestCase):
     def test_successful_registration(self, mock_email, mock_qr):
         response = self.client.post(
             self.url,
-            {"name": "Jane Doe", "email": "jane@example.com"},
+            {"full_name": "Jane Doe", "email": "jane@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -394,7 +394,7 @@ class PublicEventRegistrationTest(TestCase):
     def test_registration_sets_attending_status(self, mock_email, mock_qr):
         self.client.post(
             self.url,
-            {"name": "Jane Doe", "email": "jane@example.com"},
+            {"full_name": "Jane Doe", "email": "jane@example.com"},
             format="json",
         )
         guest = Guest.objects.get(event=self.public_event, email="jane@example.com")
@@ -404,7 +404,7 @@ class PublicEventRegistrationTest(TestCase):
     def test_private_event_returns_403(self, mock_email, mock_qr):
         response = self.client.post(
             self.private_url,
-            {"name": "Jane Doe", "email": "jane@example.com"},
+            {"full_name": "Jane Doe", "email": "jane@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -414,7 +414,7 @@ class PublicEventRegistrationTest(TestCase):
     def test_missing_email_returns_400(self, mock_email, mock_qr):
         response = self.client.post(
             self.url,
-            {"name": "Jane Doe"},
+            {"full_name": "Jane Doe"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -430,12 +430,12 @@ class PublicEventRegistrationTest(TestCase):
     def test_duplicate_registration_returns_400(self, mock_email, mock_qr):
         self.client.post(
             self.url,
-            {"name": "Jane Doe", "email": "jane@example.com"},
+            {"full_name": "Jane Doe", "email": "jane@example.com"},
             format="json",
         )
         response = self.client.post(
             self.url,
-            {"name": "Jane Again", "email": "jane@example.com"},
+            {"full_name": "Jane Again", "email": "jane@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -444,7 +444,7 @@ class PublicEventRegistrationTest(TestCase):
     def test_nonexistent_event_returns_404(self, mock_email, mock_qr):
         response = self.client.post(
             f"/api/events/{uuid.uuid4()}/register/",
-            {"name": "Jane Doe", "email": "jane@example.com"},
+            {"full_name": "Jane Doe", "email": "jane@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -540,7 +540,7 @@ class PublicEventBySlugTest(TestCase):
     def test_successful_registration_by_slug(self, mock_qr, mock_email):
         response = self.client.post(
             f"/api/events/slug/{self.public_event.slug}/guests/",
-            {"name": "Slug User", "email": "sluguser@example.com"},
+            {"full_name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -554,7 +554,7 @@ class PublicEventBySlugTest(TestCase):
     def test_private_event_register_by_slug_returns_403(self, mock_qr, mock_email):
         response = self.client.post(
             f"/api/events/slug/{self.private_event.slug}/guests/",
-            {"name": "Slug User", "email": "sluguser@example.com"},
+            {"full_name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
@@ -564,7 +564,7 @@ class PublicEventBySlugTest(TestCase):
     def test_nonexistent_event_register_by_slug_returns_404(self, mock_qr, mock_email):
         response = self.client.post(
             "/api/events/slug/no-such-event/guests/",
-            {"name": "Slug User", "email": "sluguser@example.com"},
+            {"full_name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -589,3 +589,286 @@ class EventLogoLoadingTest(TestCase):
         self.assertEqual(loaded.size, (20, 20))
 
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
+# Dynamic registration fields tests
+# ---------------------------------------------------------------------------
+
+@override_settings(SEND_EMAIL_ASYNC=False, SECURE_SSL_REDIRECT=False)
+@patch("events.views.generate_qr_code")
+@patch("events.views.send_guest_qr_email")
+class DynamicRegistrationFieldsTest(TestCase):
+    """Tests for event-specific dynamic registration form fields."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    # ------------------------------------------------------------------
+    # Default fields (event with empty registration_fields)
+    # ------------------------------------------------------------------
+
+    def test_default_fields_accept_full_name_and_email(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Default Fields Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Alice Smith", "email": "alice@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Guest.objects.filter(event=event, email="alice@example.com").exists())
+
+    def test_default_fields_require_full_name(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Default Required Test",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"email": "alice@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("full_name", response.data)
+
+    def test_default_fields_require_email(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Default Email Required",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Alice Smith"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    def test_invalid_email_format_rejected(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Email Format Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Alice Smith", "email": "not-an-email"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+
+    # ------------------------------------------------------------------
+    # Custom fields on the event
+    # ------------------------------------------------------------------
+
+    def test_custom_required_field_validated(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Custom Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "company", "type": "text", "required": True, "label": "Company"},
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Bob Jones", "email": "bob@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("company", response.data)
+
+    def test_custom_required_field_accepted_when_present(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Custom Required Accepted",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "company", "type": "text", "required": True, "label": "Company"},
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Bob Jones", "email": "bob@example.com", "company": "Acme"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_optional_custom_field_not_required(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Optional Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "dietary", "type": "text", "required": False, "label": "Dietary needs"},
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Carol White", "email": "carol@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_select_field_rejects_invalid_option(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Select Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "meal",
+                    "type": "select",
+                    "required": True,
+                    "label": "Meal preference",
+                    "options": ["Vegan", "Non-veg", "Halal"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Dave Green", "email": "dave@example.com", "meal": "Keto"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("meal", response.data)
+
+    def test_select_field_accepts_valid_option(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Select Valid Option",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "meal",
+                    "type": "select",
+                    "required": True,
+                    "label": "Meal preference",
+                    "options": ["Vegan", "Non-veg", "Halal"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Eve Brown", "email": "eve@example.com", "meal": "Vegan"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    # ------------------------------------------------------------------
+    # GuestResponse saving
+    # ------------------------------------------------------------------
+
+    def test_guest_response_created_on_registration(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Response Saved Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "company", "type": "text", "required": False, "label": "Company"},
+            ],
+        )
+        self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Frank Black", "email": "frank@example.com", "company": "Tech Co"},
+            format="json",
+        )
+        guest = Guest.objects.get(event=event, email="frank@example.com")
+        self.assertTrue(GuestResponse.objects.filter(event=event, guest=guest).exists())
+
+    def test_guest_response_data_contains_submitted_fields(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Response Data Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "company", "type": "text", "required": False, "label": "Company"},
+            ],
+        )
+        self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Grace Hall", "email": "grace@example.com", "company": "Startup"},
+            format="json",
+        )
+        response = GuestResponse.objects.get(event=event)
+        self.assertEqual(response.data["full_name"], "Grace Hall")
+        self.assertEqual(response.data["email"], "grace@example.com")
+        self.assertEqual(response.data["company"], "Startup")
+
+    def test_guest_response_created_for_default_fields(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Default Response Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Hank Fox", "email": "hank@example.com"},
+            format="json",
+        )
+        self.assertEqual(GuestResponse.objects.filter(event=event).count(), 1)
+        gr = GuestResponse.objects.get(event=event)
+        self.assertEqual(gr.data["full_name"], "Hank Fox")
+        self.assertEqual(gr.data["email"], "hank@example.com")
+
+    # ------------------------------------------------------------------
+    # registration_fields included in EventSerializer
+    # ------------------------------------------------------------------
+
+    def test_event_serializer_exposes_registration_fields(self, mock_email, mock_qr):
+        fields = [
+            {"name": "full_name", "type": "text", "required": True},
+            {"name": "email", "type": "email", "required": True},
+        ]
+        event = Event.objects.create(
+            name="Serializer Fields Event",
+            location="Venue",
+            start_datetime=timezone.now(),
+            registration_fields=fields,
+        )
+        response = self.client.get(f"/api/events/{event.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["registration_fields"], fields)
+
+    def test_event_serializer_registration_fields_empty_by_default(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="No Fields Event",
+            location="Venue",
+            start_datetime=timezone.now(),
+        )
+        response = self.client.get(f"/api/events/{event.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["registration_fields"], [])
