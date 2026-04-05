@@ -872,3 +872,176 @@ class DynamicRegistrationFieldsTest(TestCase):
         response = self.client.get(f"/api/events/{event.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["registration_fields"], [])
+
+    # ------------------------------------------------------------------
+    # New field types: number, radio, checkbox
+    # ------------------------------------------------------------------
+
+    def test_number_field_accepts_valid_number(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Number Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "age", "type": "number", "required": True, "label": "Age"},
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Alice", "email": "alice@example.com", "age": "25"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_number_field_rejects_non_numeric(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Number Reject Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "age", "type": "number", "required": True, "label": "Age"},
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Bob", "email": "bob@example.com", "age": "not-a-number"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("age", response.data)
+
+    def test_radio_field_accepts_valid_option(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Radio Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "tshirt",
+                    "type": "radio",
+                    "required": True,
+                    "label": "T-shirt size",
+                    "options": ["S", "M", "L", "XL"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Carol", "email": "carol@example.com", "tshirt": "M"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_radio_field_rejects_invalid_option(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Radio Reject Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "tshirt",
+                    "type": "radio",
+                    "required": True,
+                    "label": "T-shirt size",
+                    "options": ["S", "M", "L", "XL"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Dave", "email": "dave@example.com", "tshirt": "XXL"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("tshirt", response.data)
+
+    def test_checkbox_field_accepts_valid_options_list(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Checkbox Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "interests",
+                    "type": "checkbox",
+                    "required": False,
+                    "label": "Interests",
+                    "options": ["Music", "Art", "Tech", "Sports"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Eve", "email": "eve@example.com", "interests": ["Music", "Tech"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        gr = GuestResponse.objects.get(event=event)
+        self.assertEqual(gr.data["interests"], ["Music", "Tech"])
+
+    def test_checkbox_required_field_rejects_empty(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Checkbox Required Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "interests",
+                    "type": "checkbox",
+                    "required": True,
+                    "label": "Interests",
+                    "options": ["Music", "Art", "Tech"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Frank", "email": "frank@example.com", "interests": []},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("interests", response.data)
+
+    def test_checkbox_rejects_invalid_option(self, mock_email, mock_qr):
+        event = Event.objects.create(
+            name="Checkbox Invalid Option Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {
+                    "name": "interests",
+                    "type": "checkbox",
+                    "required": False,
+                    "label": "Interests",
+                    "options": ["Music", "Art", "Tech"],
+                },
+            ],
+        )
+        response = self.client.post(
+            f"/api/events/{event.id}/register/",
+            {"full_name": "Grace", "email": "grace@example.com", "interests": ["Music", "Cooking"]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("interests", response.data)

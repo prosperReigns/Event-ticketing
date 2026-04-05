@@ -32,6 +32,7 @@ def _validate_registration_data(data, fields):
     Validate *data* dict against *fields* spec.
 
     Returns (errors: dict, validated: dict).  *errors* is empty on success.
+    Supported field types: text, email, number, select, radio, checkbox, textarea.
     """
     errors = {}
     validated = {}
@@ -43,13 +44,38 @@ def _validate_registration_data(data, fields):
         options = field.get("options", [])
 
         raw = data.get(field_name, "")
+
+        # Checkbox fields expect a list of selected values.
+        if field_type == "checkbox":
+            if isinstance(raw, list):
+                value = raw
+            elif raw:
+                value = [raw]
+            else:
+                value = []
+
+            if required and not value:
+                errors[field_name] = "This field is required."
+                continue
+
+            if value and options:
+                invalid = [v for v in value if v not in options]
+                if invalid:
+                    errors[field_name] = (
+                        f"Invalid choices: {', '.join(str(v) for v in invalid)}."
+                    )
+                    continue
+
+            validated[field_name] = value
+            continue
+
         value = raw.strip() if isinstance(raw, str) else raw
 
-        if required and not value:
+        if required and not value and value != 0:
             errors[field_name] = "This field is required."
             continue
 
-        if value:
+        if value or value == 0:
             if field_type == "email":
                 try:
                     validate_email(str(value))
@@ -57,7 +83,14 @@ def _validate_registration_data(data, fields):
                     errors[field_name] = "Enter a valid email address."
                     continue
 
-            if field_type == "select" and options and value not in options:
+            if field_type == "number":
+                try:
+                    float(str(value))
+                except (ValueError, TypeError):
+                    errors[field_name] = "Enter a valid number."
+                    continue
+
+            if field_type in ("select", "radio") and options and value not in options:
                 errors[field_name] = (
                     f"Invalid choice. Valid options are: {', '.join(options)}."
                 )

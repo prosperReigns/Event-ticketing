@@ -12,6 +12,12 @@ CORS_ALLOW_ALL_ORIGINS = True
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
 CORS_ALLOW_CREDENTIALS = True  # Dev frontend uses cookies/CSRF tokens across ports.
 
+# Disable request throttling in dev/test so automated tests don't hit 429 errors.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_THROTTLE_CLASSES": [],
+    "DEFAULT_THROTTLE_RATES": {},
+}
 
 db_name = config("DATABASE_NAME", default="")
 if db_name:
