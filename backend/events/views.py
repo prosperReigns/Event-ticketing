@@ -1,6 +1,7 @@
 import logging
-import re
 
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import viewsets, permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -19,8 +20,6 @@ _DEFAULT_REGISTRATION_FIELDS = [
     {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
     {"name": "email", "type": "email", "required": True, "label": "Email"},
 ]
-
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _get_effective_fields(event):
@@ -51,9 +50,12 @@ def _validate_registration_data(data, fields):
             continue
 
         if value:
-            if field_type == "email" and not _EMAIL_RE.match(str(value)):
-                errors[field_name] = "Enter a valid email address."
-                continue
+            if field_type == "email":
+                try:
+                    validate_email(str(value))
+                except DjangoValidationError:
+                    errors[field_name] = "Enter a valid email address."
+                    continue
 
             if field_type == "select" and options and value not in options:
                 errors[field_name] = (
@@ -153,13 +155,13 @@ class PublicEventRegisterView(APIView):
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Extract canonical name/email from the validated payload.
+        # Support both 'full_name' (default key) and 'name' so that events
+        # with a custom field named 'name' also work correctly.
         name = (validated.get("full_name") or validated.get("name", "")).strip()
         email = validated.get("email", "").strip().lower()
 
         if not name:
             return Response({"full_name": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not email:
-            return Response({"email": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         if Guest.objects.filter(event=event, email__iexact=email).exists():
             return Response(
