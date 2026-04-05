@@ -34,7 +34,7 @@ const App = () => {
             element={<UpdateGuest />}
           />
           <Route path="/checkin" element={<CheckIn />} />
-          <Route path="/register/:eventSlug" element={<RegisterPage />} />
+          <Route path="/register/:slug" element={<RegisterPage />} />
           <Route path="/rsvp/:token" element={<RsvpPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

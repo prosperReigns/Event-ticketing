@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
+from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 
 
@@ -44,10 +45,8 @@ class Event(models.Model):
             # self.id is a UUID generated at instantiation, so it is always available.
             base_slug = slugify(str(self.id)) or "event"
         slug = base_slug
-        counter = 2
         while Event.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-            slug = f"{base_slug}-{counter}"
-            counter += 1
+            slug = f"{base_slug}-{get_random_string(6).lower()}"
         return slug
 
     def save(self, *args, **kwargs):

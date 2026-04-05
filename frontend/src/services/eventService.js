@@ -11,7 +11,7 @@ export const getEvent = async (eventId) => {
 };
 
 export const getPublicEvent = async (slug) => {
-  const response = await api.get(`events/public/${slug}/`);
+  const response = await api.get(`events/slug/${slug}/`);
   return response.data;
 };
 
@@ -36,6 +36,6 @@ export const registerForEvent = async (eventId, payload) => {
 };
 
 export const registerForEventBySlug = async (slug, payload) => {
-  const response = await api.post(`events/public/${slug}/register/`, payload);
+  const response = await api.post(`events/slug/${slug}/guests/`, payload);
   return response.data;
 };

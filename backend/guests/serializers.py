@@ -76,3 +76,8 @@ class RSVPSubmissionSerializer(serializers.Serializer):
     phone = serializers.CharField(required=False, allow_blank=True)
     rsvp_status = serializers.ChoiceField(choices=Guest.RSVP_STATUS_CHOICES)
 
+
+class PublicGuestRegistrationSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+

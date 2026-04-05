@@ -6,7 +6,7 @@ import { getErrorMessage } from "../api/axios.js";
 import { getPublicEvent, registerForEventBySlug } from "../services/eventService.js";
 
 const RegisterPage = () => {
-  const { eventSlug } = useParams();
+  const { slug } = useParams();
   const [event, setEvent] = useState(null);
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [isLoading, setIsLoading] = useState(true);
@@ -26,7 +26,7 @@ const RegisterPage = () => {
       setNotPublic(false);
 
       try {
-        const data = await getPublicEvent(eventSlug);
+        const data = await getPublicEvent(slug);
         if (!isMounted) return;
         setEvent(data);
       } catch (err) {
@@ -43,7 +43,7 @@ const RegisterPage = () => {
       }
     };
 
-    if (eventSlug) {
+    if (slug) {
       fetchEvent();
     } else {
       setNotFound(true);
@@ -53,7 +53,7 @@ const RegisterPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [eventSlug]);
+  }, [slug]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -77,7 +77,7 @@ const RegisterPage = () => {
 
     setIsSubmitting(true);
     try {
-      await registerForEventBySlug(eventSlug, {
+      await registerForEventBySlug(slug, {
         name: formData.name.trim(),
         email: formData.email.trim(),
       });
