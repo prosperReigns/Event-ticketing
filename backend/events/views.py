@@ -1,18 +1,69 @@
 import logging
+import re
 
 from rest_framework import viewsets, permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from guests.models import Guest
-from guests.serializers import PublicGuestRegistrationSerializer
+from guests.models import Guest, GuestResponse
 from core.services.qr_service import generate_qr_code
 from core.services.email_service import send_guest_qr_email
 from .models import Event
 from .serializers import EventSerializer
 
 logger = logging.getLogger(__name__)
+
+# Default registration fields used when an event has none configured.
+_DEFAULT_REGISTRATION_FIELDS = [
+    {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+    {"name": "email", "type": "email", "required": True, "label": "Email"},
+]
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _get_effective_fields(event):
+    """Return the event's registration fields, or the default fields if none are set."""
+    return event.registration_fields if event.registration_fields else _DEFAULT_REGISTRATION_FIELDS
+
+
+def _validate_registration_data(data, fields):
+    """
+    Validate *data* dict against *fields* spec.
+
+    Returns (errors: dict, validated: dict).  *errors* is empty on success.
+    """
+    errors = {}
+    validated = {}
+
+    for field in fields:
+        field_name = field["name"]
+        field_type = field.get("type", "text")
+        required = field.get("required", False)
+        options = field.get("options", [])
+
+        raw = data.get(field_name, "")
+        value = raw.strip() if isinstance(raw, str) else raw
+
+        if required and not value:
+            errors[field_name] = "This field is required."
+            continue
+
+        if value:
+            if field_type == "email" and not _EMAIL_RE.match(str(value)):
+                errors[field_name] = "Enter a valid email address."
+                continue
+
+            if field_type == "select" and options and value not in options:
+                errors[field_name] = (
+                    f"Invalid choice. Valid options are: {', '.join(options)}."
+                )
+                continue
+
+        validated[field_name] = value
+
+    return errors, validated
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -96,12 +147,19 @@ class PublicEventRegisterView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = PublicGuestRegistrationSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        fields = _get_effective_fields(event)
+        errors, validated = _validate_registration_data(request.data, fields)
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        name = serializer.validated_data["name"].strip()
-        email = serializer.validated_data["email"].strip().lower()
+        # Extract canonical name/email from the validated payload.
+        name = (validated.get("full_name") or validated.get("name", "")).strip()
+        email = validated.get("email", "").strip().lower()
+
+        if not name:
+            return Response({"full_name": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not email:
+            return Response({"email": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         if Guest.objects.filter(event=event, email__iexact=email).exists():
             return Response(
@@ -116,6 +174,8 @@ class PublicEventRegisterView(APIView):
             rsvp_status=Guest.RSVP_STATUS_ATTENDING,
             is_placeholder=False,
         )
+
+        GuestResponse.objects.create(event=event, guest=guest, data=validated)
 
         try:
             generate_qr_code(guest)

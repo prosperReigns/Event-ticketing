@@ -43,3 +43,21 @@ class Guest(models.Model):
 
     def __str__(self):
         return f"{self.name} – {self.event.name}"
+
+
+class GuestResponse(models.Model):
+    """Stores the raw submitted form data for a public event registration."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="guest_responses")
+    guest = models.OneToOneField(
+        Guest,
+        on_delete=models.CASCADE,
+        related_name="response",
+        null=True,
+        blank=True,
+    )
+    data = models.JSONField()
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Response for {self.event.name} at {self.submitted_at}"
