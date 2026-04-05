@@ -6,6 +6,251 @@ import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
 import { getEvent, updateEvent } from "../services/eventService.js";
 
+const FIELD_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "email", label: "Email" },
+  { value: "number", label: "Number" },
+  { value: "textarea", label: "Text Area" },
+  { value: "select", label: "Dropdown (select)" },
+  { value: "radio", label: "Radio buttons" },
+  { value: "checkbox", label: "Checkboxes" },
+];
+
+const slugify = (str) =>
+  str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const EMPTY_FIELD = {
+  label: "",
+  name: "",
+  type: "text",
+  required: false,
+  options: [],
+};
+
+const FieldBuilder = ({ fields, onChange }) => {
+  const [draft, setDraft] = useState(EMPTY_FIELD);
+  const [optionInput, setOptionInput] = useState("");
+  const [draftError, setDraftError] = useState("");
+
+  const needsOptions = ["select", "radio", "checkbox"].includes(draft.type);
+
+  const handleDraftChange = (e) => {
+    const { name, value, type: inputType, checked } = e.target;
+    setDraft((prev) => {
+      const updated = {
+        ...prev,
+        [name]: inputType === "checkbox" ? checked : value,
+      };
+      if (name === "label") {
+        updated.name = slugify(value);
+      }
+      if (name === "type") {
+        updated.options = [];
+      }
+      return updated;
+    });
+    setDraftError("");
+  };
+
+  const addOption = () => {
+    const opt = optionInput.trim();
+    if (!opt) return;
+    if (draft.options.includes(opt)) {
+      setDraftError(`Option "${opt}" already exists.`);
+      return;
+    }
+    setDraft((prev) => ({ ...prev, options: [...prev.options, opt] }));
+    setOptionInput("");
+    setDraftError("");
+  };
+
+  const removeOption = (opt) => {
+    setDraft((prev) => ({
+      ...prev,
+      options: prev.options.filter((o) => o !== opt),
+    }));
+  };
+
+  const addField = () => {
+    if (!draft.label.trim()) {
+      setDraftError("Field label is required.");
+      return;
+    }
+    if (!draft.name) {
+      setDraftError("Field name could not be generated from the label.");
+      return;
+    }
+    if (fields.some((f) => f.name === draft.name)) {
+      setDraftError(`A field named "${draft.name}" already exists.`);
+      return;
+    }
+    if (needsOptions && draft.options.length === 0) {
+      setDraftError("Add at least one option for this field type.");
+      return;
+    }
+    onChange([...fields, { ...draft }]);
+    setDraft(EMPTY_FIELD);
+    setOptionInput("");
+    setDraftError("");
+  };
+
+  const removeField = (index) => {
+    onChange(fields.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm font-medium text-slate-700">Registration fields</p>
+      <p className="text-xs text-slate-500">
+        Define the fields guests must fill in when registering. Leave empty to
+        use the defaults (Full Name + Email).
+      </p>
+
+      {fields.length > 0 && (
+        <ul className="space-y-2">
+          {fields.map((f, i) => (
+            <li
+              key={f.name}
+              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm"
+            >
+              <span>
+                <span className="font-medium text-slate-800">{f.label}</span>
+                <span className="ml-2 text-slate-500">
+                  ({f.type}
+                  {f.required ? ", required" : ""})
+                </span>
+                {f.options && f.options.length > 0 && (
+                  <span className="ml-2 text-slate-400">
+                    [{f.options.join(", ")}]
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeField(i)}
+                className="ml-4 text-xs text-red-500 hover:text-red-700"
+                aria-label={`Remove field ${f.label}`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+          Add a field
+        </p>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-slate-700">
+            Label
+            <input
+              type="text"
+              name="label"
+              value={draft.label}
+              onChange={handleDraftChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+              placeholder="e.g. Company Name"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Type
+            <select
+              name="type"
+              value={draft.type}
+              onChange={handleDraftChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+            >
+              {FIELD_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            name="required"
+            checked={draft.required}
+            onChange={handleDraftChange}
+            className="accent-slate-900"
+          />
+          Required field
+        </label>
+
+        {needsOptions && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-slate-600">Options</p>
+            {draft.options.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {draft.options.map((opt) => (
+                  <span
+                    key={opt}
+                    className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                  >
+                    {opt}
+                    <button
+                      type="button"
+                      onClick={() => removeOption(opt)}
+                      className="text-slate-400 hover:text-red-500"
+                      aria-label={`Remove option ${opt}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={optionInput}
+                onChange={(e) => setOptionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addOption();
+                  }
+                }}
+                className="flex-1 rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-slate-400 focus:outline-none"
+                placeholder="Type an option and press Enter"
+              />
+              <button
+                type="button"
+                onClick={addOption}
+                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        )}
+
+        {draftError && (
+          <p className="text-xs text-red-600">{draftError}</p>
+        )}
+
+        <button
+          type="button"
+          onClick={addField}
+          className="rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+        >
+          + Add field
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const toDateTimeLocal = (value) => {
   if (!value) {
     return "";
@@ -34,6 +279,7 @@ const UpdateEvent = () => {
     qr_color: "",
     qr_caption: "",
   });
+  const [registrationFields, setRegistrationFields] = useState([]);
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +319,9 @@ const UpdateEvent = () => {
           qr_caption: data?.qr_caption ?? "Scan to check in",
           registration_type: data?.registration_type || "private",
         });
+        setRegistrationFields(
+          Array.isArray(data?.registration_fields) ? data.registration_fields : []
+        );
         setLogoPreview(data?.logo || "");
       } catch (err) {
         if (isMounted) {
@@ -146,6 +395,7 @@ const UpdateEvent = () => {
       payload.append("qr_color", formData.qr_color.trim());
       payload.append("qr_caption", formData.qr_caption.trim());
       payload.append("registration_type", formData.registration_type);
+      payload.append("registration_fields", JSON.stringify(registrationFields));
       if (logoFile) {
         payload.append("logo", logoFile);
       }
@@ -316,6 +566,11 @@ const UpdateEvent = () => {
               </label>
             </div>
           </div>
+
+          <FieldBuilder
+            fields={registrationFields}
+            onChange={setRegistrationFields}
+          />
 
           {logoPreview ? (
             <div className="flex items-center gap-3 text-sm text-slate-600">
