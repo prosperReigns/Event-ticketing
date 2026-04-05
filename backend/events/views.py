@@ -35,9 +35,38 @@ class EventViewSet(viewsets.ModelViewSet):
         return super().get_throttles()
 
 
+class PublicEventDetailView(APIView):
+    """
+    GET /api/events/public/{slug}/  – retrieve a public event by its slug.
+
+    Used by the frontend registration page to display event details before
+    the user submits their information.  Returns 403 if the event is not
+    open for public registration.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, event_slug):
+        try:
+            event = Event.objects.get(slug=event_slug)
+        except Event.DoesNotExist:
+            return Response({"detail": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if event.registration_type != Event.REGISTRATION_PUBLIC:
+            return Response(
+                {"detail": "This event is not open for public registration."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = EventSerializer(event)
+        return Response(serializer.data)
+
+
 class PublicEventRegisterView(APIView):
     """
     POST /api/events/{pk}/register/  – self-register for a public event.
+    POST /api/events/public/{slug}/register/  – self-register using event slug.
 
     Accepts name and email, creates a Guest, generates a QR code and sends
     the invitation email.  Returns 403 if the event is not public.
@@ -46,11 +75,19 @@ class PublicEventRegisterView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
-    def post(self, request, pk):
+    def _get_event(self, pk=None, event_slug=None):
+        """Look up an event by UUID pk or slug."""
         try:
-            event = Event.objects.get(pk=pk)
+            if event_slug is not None:
+                return Event.objects.get(slug=event_slug), None
+            return Event.objects.get(pk=pk), None
         except Event.DoesNotExist:
-            return Response({"detail": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
+            return None, Response({"detail": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request, pk=None, event_slug=None):
+        event, error = self._get_event(pk=pk, event_slug=event_slug)
+        if error:
+            return error
 
         if event.registration_type != Event.REGISTRATION_PUBLIC:
             return Response(
