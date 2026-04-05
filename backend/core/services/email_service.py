@@ -18,6 +18,10 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+# Fields whose values are already shown as dedicated lines in the email template
+# (name appears in the greeting, email is the recipient address, phone has its own line).
+_STANDARD_FIELD_NAMES = {"full_name", "name", "email", "phone"}
+
 
 def send_guest_qr_email(guest) -> bool:
     """
@@ -94,8 +98,38 @@ def _build_html_content(guest) -> str:
             "event_time_display": event_time_display,
             "logo_src": logo_src,
             "qr_src": qr_src,
+            "registration_details": _build_registration_details(guest),
         },
     )
+
+
+def _build_registration_details(guest) -> list:
+    """Return a list of ``{"label": ..., "value": ...}`` dicts for any custom
+    registration fields the guest filled in, excluding the standard fields that
+    are already shown elsewhere in the email (name, email, phone).
+    """
+    try:
+        response = guest.response
+    except Exception:
+        return []
+
+    if not response or not response.data:
+        return []
+
+    fields = guest.event.registration_fields or []
+    details = []
+    for field in fields:
+        field_name = field.get("name", "")
+        if field_name in _STANDARD_FIELD_NAMES:
+            continue
+        label = field.get("label") or field_name.replace("_", " ").title()
+        value = response.data.get(field_name)
+        if value is None or value == "" or value == []:
+            continue
+        if isinstance(value, list):
+            value = ", ".join(str(v) for v in value)
+        details.append({"label": label, "value": str(value)})
+    return details
 
 
 def _get_image_field_path(image_field) -> str:

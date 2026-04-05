@@ -1096,3 +1096,151 @@ class DynamicRegistrationFieldsTest(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("interests", response.data)
+
+
+# ---------------------------------------------------------------------------
+# Email registration details tests
+# ---------------------------------------------------------------------------
+
+class EmailRegistrationDetailsTest(TestCase):
+    """Verify that custom registration field values appear in the invitation email."""
+
+    def test_custom_fields_appear_in_email_html(self):
+        event = Event.objects.create(
+            name="Custom Fields Event",
+            location="Conference Hall",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "company", "type": "text", "required": False, "label": "Company"},
+                {"name": "meal", "type": "select", "required": False, "label": "Meal Preference",
+                 "options": ["Vegan", "Non-veg"]},
+            ],
+        )
+        guest = Guest.objects.create(
+            event=event,
+            name="Alice Smith",
+            email="alice@example.com",
+            rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+        )
+        GuestResponse.objects.create(
+            event=event,
+            guest=guest,
+            data={"full_name": "Alice Smith", "email": "alice@example.com",
+                  "company": "Acme Corp", "meal": "Vegan"},
+        )
+
+        html_content = _build_html_content(guest)
+
+        self.assertIn("Company", html_content)
+        self.assertIn("Acme Corp", html_content)
+        self.assertIn("Meal Preference", html_content)
+        self.assertIn("Vegan", html_content)
+        # Standard fields should NOT appear as extra lines
+        self.assertNotIn("Full Name:", html_content)
+
+    def test_standard_fields_not_duplicated_in_custom_details(self):
+        event = Event.objects.create(
+            name="Duplicate Fields Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        guest = Guest.objects.create(
+            event=event,
+            name="Bob",
+            email="bob@example.com",
+            phone="555-1234",
+            rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+        )
+        GuestResponse.objects.create(
+            event=event,
+            guest=guest,
+            data={"full_name": "Bob", "email": "bob@example.com", "phone": "555-1234"},
+        )
+
+        html_content = _build_html_content(guest)
+
+        # phone is shown via guest.phone dedicated section; should not appear via registration_details loop
+        # We confirm there's exactly one "Phone:" occurrence (the dedicated section)
+        self.assertEqual(html_content.count("Phone:"), 1)
+
+    def test_empty_optional_field_not_shown_in_email(self):
+        event = Event.objects.create(
+            name="Empty Optional Field Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "notes", "type": "text", "required": False, "label": "Special Notes"},
+            ],
+        )
+        guest = Guest.objects.create(
+            event=event,
+            name="Carol",
+            email="carol@example.com",
+            rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+        )
+        GuestResponse.objects.create(
+            event=event,
+            guest=guest,
+            data={"full_name": "Carol", "email": "carol@example.com", "notes": ""},
+        )
+
+        html_content = _build_html_content(guest)
+
+        self.assertNotIn("Special Notes", html_content)
+
+    def test_checkbox_values_joined_in_email(self):
+        event = Event.objects.create(
+            name="Checkbox Values Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+            registration_type=Event.REGISTRATION_PUBLIC,
+            registration_fields=[
+                {"name": "full_name", "type": "text", "required": True, "label": "Full Name"},
+                {"name": "email", "type": "email", "required": True, "label": "Email"},
+                {"name": "interests", "type": "checkbox", "required": False, "label": "Interests",
+                 "options": ["Music", "Art", "Tech"]},
+            ],
+        )
+        guest = Guest.objects.create(
+            event=event,
+            name="Dave",
+            email="dave@example.com",
+            rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+        )
+        GuestResponse.objects.create(
+            event=event,
+            guest=guest,
+            data={"full_name": "Dave", "email": "dave@example.com",
+                  "interests": ["Music", "Tech"]},
+        )
+
+        html_content = _build_html_content(guest)
+
+        self.assertIn("Interests", html_content)
+        self.assertIn("Music, Tech", html_content)
+
+    def test_no_response_object_does_not_break_email(self):
+        event = Event.objects.create(
+            name="No Response Event",
+            location="Venue",
+            start_datetime=timezone.now() + timedelta(hours=1),
+        )
+        guest = Guest.objects.create(
+            event=event,
+            name="Eve",
+            email="eve@example.com",
+            rsvp_status=Guest.RSVP_STATUS_ATTENDING,
+        )
+        # No GuestResponse created
+
+        html_content = _build_html_content(guest)
+
+        self.assertIn("Eve", html_content)
+        self.assertIn("No Response Event", html_content)
