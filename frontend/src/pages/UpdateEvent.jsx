@@ -28,6 +28,7 @@ const UpdateEvent = () => {
     start_datetime: "",
     qr_color: "#0f172a",
     qr_caption: "Scan to check in",
+    registration_type: "private",
   });
   const [fieldErrors, setFieldErrors] = useState({
     qr_color: "",
@@ -70,6 +71,7 @@ const UpdateEvent = () => {
           start_datetime: toDateTimeLocal(data?.start_datetime || ""),
           qr_color: data?.qr_color || "#0f172a",
           qr_caption: data?.qr_caption ?? "Scan to check in",
+          registration_type: data?.registration_type || "private",
         });
         setLogoPreview(data?.logo || "");
       } catch (err) {
@@ -143,6 +145,7 @@ const UpdateEvent = () => {
       payload.append("start_datetime", startDateTime);
       payload.append("qr_color", formData.qr_color.trim());
       payload.append("qr_caption", formData.qr_caption.trim());
+      payload.append("registration_type", formData.registration_type);
       if (logoFile) {
         payload.append("logo", logoFile);
       }
@@ -285,6 +288,34 @@ const UpdateEvent = () => {
               PNG or JPG works best with a transparent or clean background.
             </p>
           </label>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-slate-700">Registration type</p>
+            <div className="flex gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="registration_type"
+                  value="private"
+                  checked={formData.registration_type === "private"}
+                  onChange={handleChange}
+                  className="accent-slate-900"
+                />
+                Private – admin adds guests manually
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="registration_type"
+                  value="public"
+                  checked={formData.registration_type === "public"}
+                  onChange={handleChange}
+                  className="accent-slate-900"
+                />
+                Public – anyone with the link can register
+              </label>
+            </div>
+          </div>
 
           {logoPreview ? (
             <div className="flex items-center gap-3 text-sm text-slate-600">

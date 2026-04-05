@@ -24,3 +24,8 @@ export const deleteEvent = async (eventId) => {
   const response = await api.delete(`events/${eventId}/`);
   return response.data;
 };
+
+export const registerForEvent = async (eventId, payload) => {
+  const response = await api.post(`events/${eventId}/register/`, payload);
+  return response.data;
+};
