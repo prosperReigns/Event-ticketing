@@ -21,9 +21,10 @@
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 18px 0;border:1px solid #e5e7eb;border-radius:8px;">
                   <tr>
                     <td style="padding:14px 16px;font-size:14px;line-height:1.6;color:#111827;">
-                      <div style="margin:0 0 8px 0;"><strong>Location:</strong> {{ event_location }}</div>
+                      {% if event_location %}<div style="margin:0 0 8px 0;"><strong>Location:</strong> {{ event_location }}</div>{% endif %}
                       <div style="margin:0 0 8px 0;"><strong>Date &amp; Time:</strong> {{ event_time_display }}</div>
-                      <div style="margin:0;"><strong>Table Number:</strong> {{ table_number }}</div>
+                      {% if guest_phone %}<div style="margin:0 0 8px 0;"><strong>Phone:</strong> {{ guest_phone }}</div>{% endif %}
+                      {% if table_number %}<div style="margin:0;"><strong>Table Number:</strong> {{ table_number }}</div>{% endif %}
                     </td>
                   </tr>
                 </table>

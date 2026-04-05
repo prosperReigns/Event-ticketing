@@ -8,6 +8,7 @@ import { getPublicEvent, registerForEventBySlug } from "../services/eventService
 const DEFAULT_FIELDS = [
   { name: "full_name", type: "text", required: true, label: "Full Name" },
   { name: "email", type: "email", required: true, label: "Email" },
+  { name: "phone", type: "tel", required: false, label: "Phone Number" },
 ];
 
 const inputClass =
@@ -143,8 +144,13 @@ const DynamicField = ({ field, value, onChange, fieldError }) => {
     );
   }
 
-  const inputType =
-    type === "email" ? "email" : type === "number" ? "number" : "text";
+  const INPUT_TYPE_MAP = { email: "email", number: "number", tel: "tel" };
+  const inputType = INPUT_TYPE_MAP[type] || "text";
+
+  const inputPlaceholder =
+    type === "tel"
+      ? "e.g. +1 234 567 8900"
+      : `Enter ${displayLabel.toLowerCase()}`;
 
   return (
     <div>
@@ -158,7 +164,7 @@ const DynamicField = ({ field, value, onChange, fieldError }) => {
           onChange={(e) => onChange(name, e.target.value)}
           required={required}
           className={inputClass}
-          placeholder={`Enter ${displayLabel.toLowerCase()}`}
+          placeholder={inputPlaceholder}
         />
       </label>
       {fieldError && <p className={errorClass}>{fieldError}</p>}
