@@ -40,7 +40,9 @@ class Event(models.Model):
     def _generate_unique_slug(self):
         base_slug = slugify(self.name)
         if not base_slug:
-            base_slug = str(self.id)
+            # Fallback for names that produce no ASCII slug (e.g. purely non-ASCII)
+            # self.id is a UUID generated at instantiation, so it is always available.
+            base_slug = slugify(str(self.id)) or "event"
         slug = base_slug
         counter = 2
         while Event.objects.filter(slug=slug).exclude(pk=self.pk).exists():
