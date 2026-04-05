@@ -8,6 +8,7 @@ import EventDetails from "./pages/EventDetails.jsx";
 import GuestCheckinList from "./pages/GuestCheckinList.jsx";
 import GuestList from "./pages/GuestList.jsx";
 import GuestListView from "./pages/GuestListView.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
 import RsvpPage from "./pages/RsvpPage.jsx";
 import UpdateEvent from "./pages/UpdateEvent.jsx";
 import UpdateGuest from "./pages/UpdateGuest.jsx";
@@ -33,6 +34,7 @@ const App = () => {
             element={<UpdateGuest />}
           />
           <Route path="/checkin" element={<CheckIn />} />
+          <Route path="/register/:eventId" element={<RegisterPage />} />
           <Route path="/rsvp/:token" element={<RsvpPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

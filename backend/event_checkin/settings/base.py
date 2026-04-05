@@ -170,6 +170,7 @@ BREVO_EMAIL_URL = config(
 CHECKIN_DOMAIN = config("CHECKIN_DOMAIN", default="http://127.0.0.1:8000")
 RSVP_DOMAIN = config("RSVP_DOMAIN", default=CHECKIN_DOMAIN)
 MEDIA_BASE_URL = config("MEDIA_BASE_URL", default=CHECKIN_DOMAIN)
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
 # Termii
 TERMII_API_KEY = config("TERMII_API_KEY", default="")

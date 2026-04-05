@@ -354,6 +354,124 @@ class EmailQrEmbeddingTest(TestCase):
         shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
 
 
+# ---------------------------------------------------------------------------
+# Public event registration tests
+# ---------------------------------------------------------------------------
+
+@override_settings(SEND_EMAIL_ASYNC=False, SECURE_SSL_REDIRECT=False)
+@patch("events.views.generate_qr_code")
+@patch("events.views.send_guest_qr_email")
+class PublicEventRegistrationTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.public_event = Event.objects.create(
+            name="Public Gala",
+            location="Main Hall",
+            start_datetime=timezone.now() + timedelta(hours=2),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        self.private_event = Event.objects.create(
+            name="Private Party",
+            location="VIP Room",
+            start_datetime=timezone.now() + timedelta(hours=2),
+            registration_type=Event.REGISTRATION_PRIVATE,
+        )
+        self.url = f"/api/events/{self.public_event.id}/register/"
+        self.private_url = f"/api/events/{self.private_event.id}/register/"
+
+    def test_successful_registration(self, mock_email, mock_qr):
+        response = self.client.post(
+            self.url,
+            {"name": "Jane Doe", "email": "jane@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("Registration successful", response.data["detail"])
+        self.assertTrue(Guest.objects.filter(event=self.public_event, email="jane@example.com").exists())
+        mock_qr.assert_called_once()
+        mock_email.assert_called_once()
+
+    def test_registration_sets_attending_status(self, mock_email, mock_qr):
+        self.client.post(
+            self.url,
+            {"name": "Jane Doe", "email": "jane@example.com"},
+            format="json",
+        )
+        guest = Guest.objects.get(event=self.public_event, email="jane@example.com")
+        self.assertEqual(guest.rsvp_status, Guest.RSVP_STATUS_ATTENDING)
+        self.assertFalse(guest.is_placeholder)
+
+    def test_private_event_returns_403(self, mock_email, mock_qr):
+        response = self.client.post(
+            self.private_url,
+            {"name": "Jane Doe", "email": "jane@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_qr.assert_not_called()
+        mock_email.assert_not_called()
+
+    def test_missing_email_returns_400(self, mock_email, mock_qr):
+        response = self.client.post(
+            self.url,
+            {"name": "Jane Doe"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_name_returns_400(self, mock_email, mock_qr):
+        response = self.client.post(
+            self.url,
+            {"email": "jane@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_registration_returns_400(self, mock_email, mock_qr):
+        self.client.post(
+            self.url,
+            {"name": "Jane Doe", "email": "jane@example.com"},
+            format="json",
+        )
+        response = self.client.post(
+            self.url,
+            {"name": "Jane Again", "email": "jane@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already registered", response.data["detail"])
+
+    def test_nonexistent_event_returns_404(self, mock_email, mock_qr):
+        response = self.client.post(
+            f"/api/events/{uuid.uuid4()}/register/",
+            {"name": "Jane Doe", "email": "jane@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+@override_settings(FRONTEND_URL="https://app.example.com", SECURE_SSL_REDIRECT=False)
+class EventPublicLinkTest(TestCase):
+    def test_get_public_link_returns_correct_url(self):
+        event = make_event()
+        link = event.get_public_link()
+        self.assertEqual(link, f"https://app.example.com/register/{event.id}")
+
+    def test_event_detail_api_includes_registration_type(self):
+        client = APIClient()
+        event = Event.objects.create(
+            name="Open Event",
+            location="Arena",
+            start_datetime=timezone.now(),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        response = client.get(f"/api/events/{event.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["registration_type"], Event.REGISTRATION_PUBLIC)
+
+
+# ---------------------------------------------------------------------------
+
 @override_settings(MEDIA_ROOT=str(TEST_MEDIA_ROOT))
 class EventLogoLoadingTest(TestCase):
     def test_load_event_logo_reads_from_storage_file_open(self):

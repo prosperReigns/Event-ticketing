@@ -16,6 +16,7 @@ class EventSerializer(serializers.ModelSerializer):
             "qr_caption",
             "logo",
             "is_active",
+            "registration_type",
             "created_at",
             "updated_at",
         ]

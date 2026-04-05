@@ -11,6 +11,7 @@ const EventDetails = () => {
   const [event, setEvent] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -27,6 +28,14 @@ const EventDetails = () => {
     fetchEvent();
   }, [id]);
 
+  const publicRegistrationLink = `${window.location.origin}/register/${id}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicRegistrationLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <section className="space-y-6">
@@ -56,6 +65,25 @@ const EventDetails = () => {
                 ? new Date(event.start_datetime).toLocaleString()
                 : "Schedule pending"}
             </p>
+            {event.registration_type === "public" && (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Public Registration Link
+                </p>
+                <div className="mt-2 flex items-center gap-3">
+                  <p className="truncate text-sm text-emerald-800">
+                    {publicRegistrationLink}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="shrink-0 rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-3">
