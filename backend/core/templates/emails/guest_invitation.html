@@ -24,7 +24,8 @@
                       {% if event_location %}<div style="margin:0 0 8px 0;"><strong>Location:</strong> {{ event_location }}</div>{% endif %}
                       <div style="margin:0 0 8px 0;"><strong>Date &amp; Time:</strong> {{ event_time_display }}</div>
                       {% if guest_phone %}<div style="margin:0 0 8px 0;"><strong>Phone:</strong> {{ guest_phone }}</div>{% endif %}
-                      {% if table_number %}<div style="margin:0;"><strong>Table Number:</strong> {{ table_number }}</div>{% endif %}
+                      {% if table_number %}<div style="margin:0 0 8px 0;"><strong>Table Number:</strong> {{ table_number }}</div>{% endif %}
+                      {% for detail in registration_details %}<div style="margin:0 0 8px 0;"><strong>{{ detail.label }}:</strong> {{ detail.value }}</div>{% endfor %}
                     </td>
                   </tr>
                 </table>
