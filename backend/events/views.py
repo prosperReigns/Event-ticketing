@@ -71,11 +71,13 @@ def _validate_registration_data(data, fields):
 
         value = raw.strip() if isinstance(raw, str) else raw
 
-        if required and not value and value != 0:
+        has_value = value != "" and value is not None
+
+        if required and not has_value:
             errors[field_name] = "This field is required."
             continue
 
-        if value or value == 0:
+        if has_value:
             if field_type == "email":
                 try:
                     validate_email(str(value))

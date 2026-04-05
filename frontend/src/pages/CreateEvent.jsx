@@ -122,7 +122,7 @@ const FieldBuilder = ({ fields, onChange }) => {
                   ({f.type}
                   {f.required ? ", required" : ""})
                 </span>
-                {f.options.length > 0 && (
+                {f.options && f.options.length > 0 && (
                   <span className="ml-2 text-slate-400">
                     [{f.options.join(", ")}]
                   </span>
