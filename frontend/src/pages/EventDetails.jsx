@@ -28,7 +28,9 @@ const EventDetails = () => {
     fetchEvent();
   }, [id]);
 
-  const publicRegistrationLink = `${window.location.origin}/register/${id}`;
+  const publicRegistrationLink = event
+    ? `${window.location.origin}/register/${event.slug}`
+    : "";
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicRegistrationLink).then(() => {
