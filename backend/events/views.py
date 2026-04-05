@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from guests.models import Guest
+from guests.serializers import PublicGuestRegistrationSerializer
 from core.services.qr_service import generate_qr_code
 from core.services.email_service import send_guest_qr_email
 from .models import Event
@@ -37,7 +38,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
 class PublicEventDetailView(APIView):
     """
-    GET /api/events/public/{slug}/  – retrieve a public event by its slug.
+    GET /api/events/slug/{slug}/  – retrieve a public event by its slug.
 
     Used by the frontend registration page to display event details before
     the user submits their information.  Returns 403 if the event is not
@@ -47,9 +48,9 @@ class PublicEventDetailView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
-    def get(self, request, event_slug):
+    def get(self, request, slug):
         try:
-            event = Event.objects.get(slug=event_slug)
+            event = Event.objects.get(slug=slug)
         except Event.DoesNotExist:
             return Response({"detail": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -66,7 +67,7 @@ class PublicEventDetailView(APIView):
 class PublicEventRegisterView(APIView):
     """
     POST /api/events/{pk}/register/  – self-register for a public event.
-    POST /api/events/public/{slug}/register/  – self-register using event slug.
+    POST /api/events/slug/{slug}/guests/  – self-register using event slug.
 
     Accepts name and email, creates a Guest, generates a QR code and sends
     the invitation email.  Returns 403 if the event is not public.
@@ -75,17 +76,17 @@ class PublicEventRegisterView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
-    def _get_event(self, pk=None, event_slug=None):
+    def _get_event(self, pk=None, slug=None):
         """Look up an event by UUID pk or slug."""
         try:
-            if event_slug is not None:
-                return Event.objects.get(slug=event_slug), None
+            if slug is not None:
+                return Event.objects.get(slug=slug), None
             return Event.objects.get(pk=pk), None
         except Event.DoesNotExist:
             return None, Response({"detail": "Event not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    def post(self, request, pk=None, event_slug=None):
-        event, error = self._get_event(pk=pk, event_slug=event_slug)
+    def post(self, request, pk=None, slug=None):
+        event, error = self._get_event(pk=pk, slug=slug)
         if error:
             return error
 
@@ -95,20 +96,12 @@ class PublicEventRegisterView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        name = str(request.data.get("name", "")).strip()
-        email = str(request.data.get("email", "")).strip().lower()
+        serializer = PublicGuestRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if not name:
-            return Response(
-                {"detail": "Name is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not email:
-            return Response(
-                {"detail": "Email is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        name = serializer.validated_data["name"].strip()
+        email = serializer.validated_data["email"].strip().lower()
 
         if Guest.objects.filter(event=event, email__iexact=email).exists():
             return Response(

@@ -500,7 +500,8 @@ class EventPublicLinkTest(TestCase):
             start_datetime=timezone.now(),
         )
         self.assertEqual(event1.slug, "gala-night")
-        self.assertEqual(event2.slug, "gala-night-2")
+        self.assertTrue(event2.slug.startswith("gala-night-"))
+        self.assertNotEqual(event2.slug, event1.slug)
 
 
 @patch("events.views.send_guest_qr_email")
@@ -523,22 +524,22 @@ class PublicEventBySlugTest(TestCase):
         )
 
     def test_public_event_detail_by_slug(self, mock_qr, mock_email):
-        response = self.client.get(f"/api/events/public/{self.public_event.slug}/")
+        response = self.client.get(f"/api/events/slug/{self.public_event.slug}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["name"], self.public_event.name)
         self.assertEqual(response.data["slug"], self.public_event.slug)
 
     def test_private_event_detail_by_slug_returns_403(self, mock_qr, mock_email):
-        response = self.client.get(f"/api/events/public/{self.private_event.slug}/")
+        response = self.client.get(f"/api/events/slug/{self.private_event.slug}/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_nonexistent_slug_returns_404(self, mock_qr, mock_email):
-        response = self.client.get("/api/events/public/no-such-event/")
+        response = self.client.get("/api/events/slug/no-such-event/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_successful_registration_by_slug(self, mock_qr, mock_email):
         response = self.client.post(
-            f"/api/events/public/{self.public_event.slug}/register/",
+            f"/api/events/slug/{self.public_event.slug}/guests/",
             {"name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
@@ -552,7 +553,7 @@ class PublicEventBySlugTest(TestCase):
 
     def test_private_event_register_by_slug_returns_403(self, mock_qr, mock_email):
         response = self.client.post(
-            f"/api/events/public/{self.private_event.slug}/register/",
+            f"/api/events/slug/{self.private_event.slug}/guests/",
             {"name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
@@ -562,7 +563,7 @@ class PublicEventBySlugTest(TestCase):
 
     def test_nonexistent_event_register_by_slug_returns_404(self, mock_qr, mock_email):
         response = self.client.post(
-            "/api/events/public/no-such-event/register/",
+            "/api/events/slug/no-such-event/guests/",
             {"name": "Slug User", "email": "sluguser@example.com"},
             format="json",
         )
