@@ -8,6 +8,7 @@ class EventSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "slug",
             "description",
             "location",
             "start_datetime",
@@ -20,4 +21,4 @@ class EventSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "slug", "created_at", "updated_at"]

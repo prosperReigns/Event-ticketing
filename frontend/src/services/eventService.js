@@ -10,6 +10,11 @@ export const getEvent = async (eventId) => {
   return response.data;
 };
 
+export const getPublicEvent = async (slug) => {
+  const response = await api.get(`events/public/${slug}/`);
+  return response.data;
+};
+
 export const createEvent = async (payload) => {
   const response = await api.post("events/", payload);
   return response.data;
@@ -27,5 +32,10 @@ export const deleteEvent = async (eventId) => {
 
 export const registerForEvent = async (eventId, payload) => {
   const response = await api.post(`events/${eventId}/register/`, payload);
+  return response.data;
+};
+
+export const registerForEventBySlug = async (slug, payload) => {
+  const response = await api.post(`events/public/${slug}/register/`, payload);
   return response.data;
 };

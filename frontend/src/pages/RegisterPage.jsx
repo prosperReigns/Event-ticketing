@@ -3,10 +3,10 @@ import { useParams } from "react-router-dom";
 
 import StatusAlert from "../components/StatusAlert.jsx";
 import { getErrorMessage } from "../api/axios.js";
-import { getEvent, registerForEvent } from "../services/eventService.js";
+import { getPublicEvent, registerForEventBySlug } from "../services/eventService.js";
 
 const RegisterPage = () => {
-  const { eventId } = useParams();
+  const { eventSlug } = useParams();
   const [event, setEvent] = useState(null);
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [isLoading, setIsLoading] = useState(true);
@@ -26,18 +26,15 @@ const RegisterPage = () => {
       setNotPublic(false);
 
       try {
-        const data = await getEvent(eventId);
+        const data = await getPublicEvent(eventSlug);
         if (!isMounted) return;
-
-        if (data.registration_type !== "public") {
-          setNotPublic(true);
-        } else {
-          setEvent(data);
-        }
+        setEvent(data);
       } catch (err) {
         if (!isMounted) return;
         if (err?.response?.status === 404) {
           setNotFound(true);
+        } else if (err?.response?.status === 403) {
+          setNotPublic(true);
         } else {
           setError(getErrorMessage(err, "Unable to load event details"));
         }
@@ -46,7 +43,7 @@ const RegisterPage = () => {
       }
     };
 
-    if (eventId) {
+    if (eventSlug) {
       fetchEvent();
     } else {
       setNotFound(true);
@@ -56,7 +53,7 @@ const RegisterPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [eventId]);
+  }, [eventSlug]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -80,7 +77,7 @@ const RegisterPage = () => {
 
     setIsSubmitting(true);
     try {
-      await registerForEvent(eventId, {
+      await registerForEventBySlug(eventSlug, {
         name: formData.name.trim(),
         email: formData.email.trim(),
       });

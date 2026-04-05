@@ -455,7 +455,7 @@ class EventPublicLinkTest(TestCase):
     def test_get_public_link_returns_correct_url(self):
         event = make_event()
         link = event.get_public_link()
-        self.assertEqual(link, f"https://app.example.com/register/{event.id}")
+        self.assertEqual(link, f"https://app.example.com/register/{event.slug}")
 
     def test_event_detail_api_includes_registration_type(self):
         client = APIClient()
@@ -468,6 +468,105 @@ class EventPublicLinkTest(TestCase):
         response = client.get(f"/api/events/{event.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["registration_type"], Event.REGISTRATION_PUBLIC)
+
+    def test_event_serializer_includes_slug(self):
+        client = APIClient()
+        event = Event.objects.create(
+            name="Slug Test Event",
+            location="Venue",
+            start_datetime=timezone.now(),
+        )
+        response = client.get(f"/api/events/{event.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["slug"], "slug-test-event")
+
+    def test_slug_auto_generated_from_name(self):
+        event = Event.objects.create(
+            name="My Awesome Event!",
+            location="Venue",
+            start_datetime=timezone.now(),
+        )
+        self.assertEqual(event.slug, "my-awesome-event")
+
+    def test_duplicate_name_generates_unique_slug(self):
+        event1 = Event.objects.create(
+            name="Gala Night",
+            location="Venue",
+            start_datetime=timezone.now(),
+        )
+        event2 = Event.objects.create(
+            name="Gala Night",
+            location="Venue B",
+            start_datetime=timezone.now(),
+        )
+        self.assertEqual(event1.slug, "gala-night")
+        self.assertEqual(event2.slug, "gala-night-2")
+
+
+@patch("events.views.send_guest_qr_email")
+@patch("events.views.generate_qr_code")
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PublicEventBySlugTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.public_event = Event.objects.create(
+            name="Public Gala Slug",
+            location="Main Hall",
+            start_datetime=timezone.now() + timedelta(hours=2),
+            registration_type=Event.REGISTRATION_PUBLIC,
+        )
+        self.private_event = Event.objects.create(
+            name="Private Party Slug",
+            location="VIP Room",
+            start_datetime=timezone.now() + timedelta(hours=2),
+            registration_type=Event.REGISTRATION_PRIVATE,
+        )
+
+    def test_public_event_detail_by_slug(self, mock_qr, mock_email):
+        response = self.client.get(f"/api/events/public/{self.public_event.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["name"], self.public_event.name)
+        self.assertEqual(response.data["slug"], self.public_event.slug)
+
+    def test_private_event_detail_by_slug_returns_403(self, mock_qr, mock_email):
+        response = self.client.get(f"/api/events/public/{self.private_event.slug}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_nonexistent_slug_returns_404(self, mock_qr, mock_email):
+        response = self.client.get("/api/events/public/no-such-event/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_successful_registration_by_slug(self, mock_qr, mock_email):
+        response = self.client.post(
+            f"/api/events/public/{self.public_event.slug}/register/",
+            {"name": "Slug User", "email": "sluguser@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIn("Registration successful", response.data["detail"])
+        self.assertTrue(
+            Guest.objects.filter(event=self.public_event, email="sluguser@example.com").exists()
+        )
+        mock_qr.assert_called_once()
+        mock_email.assert_called_once()
+
+    def test_private_event_register_by_slug_returns_403(self, mock_qr, mock_email):
+        response = self.client.post(
+            f"/api/events/public/{self.private_event.slug}/register/",
+            {"name": "Slug User", "email": "sluguser@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_qr.assert_not_called()
+        mock_email.assert_not_called()
+
+    def test_nonexistent_event_register_by_slug_returns_404(self, mock_qr, mock_email):
+        response = self.client.post(
+            "/api/events/public/no-such-event/register/",
+            {"name": "Slug User", "email": "sluguser@example.com"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
 from django.db import models
+from django.utils.text import slugify
 
 
 class Event(models.Model):
@@ -13,6 +14,7 @@ class Event(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField(blank=True, default="")
     location = models.CharField(max_length=500)
     start_datetime = models.DateTimeField()
@@ -35,6 +37,24 @@ class Event(models.Model):
     def __str__(self):
         return f"{self.name} ({self.start_datetime})"
 
+    def _generate_unique_slug(self):
+        base_slug = slugify(self.name)
+        if not base_slug:
+            # Fallback for names that produce no ASCII slug (e.g. purely non-ASCII)
+            # self.id is a UUID generated at instantiation, so it is always available.
+            base_slug = slugify(str(self.id)) or "event"
+        slug = base_slug
+        counter = 2
+        while Event.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        return slug
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = self._generate_unique_slug()
+        super().save(*args, **kwargs)
+
     def get_public_link(self):
         frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173").rstrip("/")
-        return f"{frontend_url}/register/{self.id}"
+        return f"{frontend_url}/register/{self.slug}"
